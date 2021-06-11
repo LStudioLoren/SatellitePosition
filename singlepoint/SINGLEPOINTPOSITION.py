@@ -70,7 +70,7 @@ class SinglePointPosition():
         return [az, el]
 
     #将卫星的x、y、z坐标系转换为enu坐标系，公式是固定的；
-    #pos是卫星的x、y、z，e是接收机相对于卫星的几何向量
+    #pos是接收机的BLH，e是接收机相对于卫星的几何向量
     def xyz2enu(self,pos, e):
         enu = []
         E9 = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
@@ -109,8 +109,7 @@ class SinglePointPosition():
         # print("asdfa enu =  [0.9832349746631751, -0.0017021136149081018, 0.18233509647993557]")
         return enu
 
-    # pos是卫星的位置x，y，z
-    #将
+    #将接收机位置从ecef转成pos（BLH格式）
     def eceftopos(self,rr, pos):
         # print("eceftopos: rr = ",rr)
         e2 = tool.FE_WGS84 * (2 - tool.FE_WGS84)
@@ -178,7 +177,20 @@ class SinglePointPosition():
             e[i] = e[i] / r
         # print("e_after= ", e)
         return e
-
+    #
+    '''
+    对接收机位置进行估算
+    流程：
+    1）先将假设接收机位置未X[dx,dy,dz,dt]
+    2）将X赋值给rr，rr记录的是上一次计算出来的X
+    3）钟差dtr =X[3]
+    4)将rr从ecef坐标系转换为大地坐标系pos（B、L、H）
+    5）将同一时刻的星历数据、观测量数据、ecef坐标的接收机位置、BLH坐标的接收机位置，误差参数、钟差传入rescode方法，
+        进行伪距残差、几何矩阵、伪距矩阵、参与解算卫星数等计算，并加载到sppparm中；
+    6）对几何矩阵e,伪距矩阵V，进行加权，权重为Var
+    7）进行LSP计算，得出dX[dx,dy,dz,dt],并且X+=dX
+    8）将LSP输出的X进行统计dot(dX)，如果小于1E-4，则返回X为最后结果，否则重复2-7
+    '''
     def estpos(self,nav_list, OBS_P, last_X):
         i = 0
         # V是伪距残差数列
