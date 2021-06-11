@@ -1,6 +1,36 @@
 import tool
 import numpy as np
 #单点定位计算
+'''
+单点定位的原理：ts卫星时间，tu接收机时间，dts是卫星时间与gps时差，dtu接收机与gps时差,P是伪距
+1）P = C*(ts - tu)+C*(dts-dtu)
+2）P（s-u） = C*（ts-tu）是卫星与接收机的几何距离
+3）真实伪距P = P（stu）(t)+C（dts-dtu）+I(t)+T(t)
+4）P（stu）(t) = sqrt（（Xs- Xu）^2+(Ys-Yu)^2+(Zs -Zu)^2），(Xs,Ys,Zs)是卫星的位置，（Xu，Yu，Zu）是接收机的位置
+5）进行泰勒级数展开并取一次项后：
+P（stu）(t) = (P（stu）(t))0 + (-1*(Xs-Xu)/(P（stu）(t))0 )*dX+(-1*(Ys-Yu)/(P（stu）(t))0 )*dY+(-1*(Zs-Zu)/(P（stu）(t))0 )*dZ
+令(-1*(Xs-Xu)/(P（stu）(t))0 ) = -k
+(-1*(Ys-Yu)/(P（stu）(t))0 ) = -l
+(-1*(Zs-Zu)/(P（stu）(t))0 ) = -m
+C（dts-dtu） = CdT
+(P（stu）(t))0  = r   r是卫星与接收机的几何距离
+6)P = (P（stu）(t))0  -k(t)*dX-l(t)*dY-m(t)*dZ +C*dT +I(t)+T(t)
+...
+单系统情况下，有几个卫星就有几个上述方程
+7)进行组装矩阵：
+P = [P1,P2,P3...Pn]
+r = [r1+I(t)+T(t),r2+I(t)+T(t),r3+I(t)+T(t)...rn+I(t)+T(t)]
+
+e = [-k1,-l1,-m1,C
+     -k2,-l2,-m2,C
+     ...
+     -kn,-ln,-mn,C]
+未知参数DX = [dX,dY,dZ,dT]
+最后就变成P = r + e*DX
+8)根据最小二乘法
+DX = (eT*e)^-1*eT（P-r）
+     
+'''
 class SinglePointPosition():
     # 计算卫星的对应测量点的方位角；这是固定算法，需要将
     def satAzel(self,pos, e):
@@ -109,6 +139,8 @@ class SinglePointPosition():
         return r
 
     #nav是星历数据，rr是当前接收机位置
+    #Xs就是卫星的x，Xu就是接收机的X
+    #原理中的（1 / （P（t0）= 伪距））*（Xs - Xu）
     def e_corr(self,nav, rr):
         e = [0, 0, 0, 1]
         #将卫星的x、y、z分别减去接收机的位置，得出接收机相对于卫星的x、y、z方向距离，即e数组
@@ -119,7 +151,7 @@ class SinglePointPosition():
         r = np.sqrt(tool.dot(e))
         # print("r = ", r, "  e_before= ", e)
         for i in range(3):
-            # 计算接收机到卫星的向量vector
+            # 计算接收机到卫星的向量vector，就是x
             # 这里是重点：将e数组中x、y、z除以距离r，e数组重新赋值为接收机相对于卫星的x、y、z的向量值。
             e[i] = e[i] / r
         # print("e_after= ", e)
