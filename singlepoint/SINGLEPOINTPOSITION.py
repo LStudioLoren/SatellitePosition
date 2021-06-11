@@ -184,17 +184,13 @@ class SinglePointPosition():
             dtr = X[3]
             # rr是x，Y,z，pos是ecef的位置
             pos = self.eceftopos(rr, pos)
-
-
             rescode_data = self.rescode(nav_list, OBS_P, rr, pos, err, dtr, V, Var)
             # vn可用卫星数
             vn = rescode_data[0]
-            #
             e_matrix = rescode_data[1]
             Var = rescode_data[2]
             V = rescode_data[3]
             # print("e = ",e_matrix)
-            i = j = 0
             n = vn
             m = 4
             # print(e_matrix)
