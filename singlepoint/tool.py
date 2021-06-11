@@ -15,6 +15,8 @@ def dot(rr):
     return rr[0]*rr[0]+rr[1]*rr[1]+rr[2]*rr[2]
 def dot2(rr):
     return rr[0]*rr[0]+rr[1]*rr[1]
+
+#这里的得出来的是A的倒转*B矩阵，
 def mulmatirix_signle(n,k,m,A,B):
     C = []
     for i in range(n):
@@ -25,6 +27,7 @@ def mulmatirix_signle(n,k,m,A,B):
             C.append(d)
     #print(" = ", C)
     return C
+#这里是A倒转*A
 def mulmatirix_multi(n,k,m,A,B):
     AAT = []
     for i in range(n):
@@ -38,7 +41,18 @@ def mulmatirix_multi(n,k,m,A,B):
         AAT.append(d)
     #print("Q = A*A'=", AAT)
     return AAT
-#laster sqrt p
+#Least squares approximation  最小二乘法估算，二乘就是平方的意思。
+'''
+单点定位核心数学问题就是，已知每个卫星的位置、以及接收机到卫星的伪距，计算接收机的位置
+r = P - e*X
+-1*(r-p) = -1*(-e)*X
+这里的e就是接收机相对于卫星的向量矩阵，且在组装的时候，乘以-1
+P-r就是伪距减去卫星的距离，即得出来是负的接收机的位置
+eX = P-r
+这个公式也是固定的最小二乘法公式，（e*e的倒转矩阵）的逆矩阵 * （接收机距离*e的倒转矩阵）就得出X，其中包含4个结果，分别是接收机的X、Y、Z以及dtr，钟差值。
+X = (e*e_t)^-1(P-r)*e_t
+
+'''
 def LSP(n,k,m,A,y,C):
     #A*dx=y[p-r]  -》A*dx-y = 0
     #根据矩阵
@@ -47,6 +61,7 @@ def LSP(n,k,m,A,y,C):
     #Q = A*A'
     Q = mulmatirix_multi(n,k,m,A,A)
     #Q_1 = Q inv,Q-1
+    #这个是将A*A的倒转求逆
     Q_1 = np.linalg.inv(Q)
     C = mulmatirix_signle(n,1,n,Q_1,Ay)
     return C
