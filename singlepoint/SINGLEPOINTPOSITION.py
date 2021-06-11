@@ -140,7 +140,8 @@ class SinglePointPosition():
 
     #nav是星历数据，rr是当前接收机位置
     #Xs就是卫星的x，Xu就是接收机的X
-    #原理中的（1 / （P（t0）= 伪距））*（Xs - Xu）
+    #原理中的（-1 / （P（t0）= 伪距））*（Xs - Xu）
+
     def e_corr(self,nav, rr):
         e = [0, 0, 0, 1]
         #将卫星的x、y、z分别减去接收机的位置，得出接收机相对于卫星的x、y、z方向距离，即e数组
