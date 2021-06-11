@@ -31,6 +31,24 @@ e = [-k1,-l1,-m1,C
 DX = (eT*e)^-1*eT（P-r）
      
 '''
+#LSP参数类
+class SPPParm():
+    #参与解算卫星数据
+    vn = 0
+    #几何矩阵
+    e_matrix = []
+    #伪距矩阵
+    V = []
+    #加权矩阵
+    Var = []
+
+    def init(self,vn,e,var,v):
+        self.vn = vn
+        self.e_matrix = e
+        self.Var = var
+        self.V = v
+
+#单点定位算法类
 class SinglePointPosition():
     # 计算卫星的对应测量点的方位角；这是固定算法，需要将
     def satAzel(self,pos, e):
@@ -50,7 +68,9 @@ class SinglePointPosition():
             el = np.arcsin(enu[2])
             # print("az = ",az,"el",el,enu[0],enu[1],enu[2])
         return [az, el]
+
     #将卫星的x、y、z坐标系转换为enu坐标系，公式是固定的；
+    #pos是卫星的x、y、z，e是接收机相对于卫星的几何向量
     def xyz2enu(self,pos, e):
         enu = []
         E9 = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
@@ -90,6 +110,7 @@ class SinglePointPosition():
         return enu
 
     # pos是卫星的位置x，y，z
+    #将
     def eceftopos(self,rr, pos):
         # print("eceftopos: rr = ",rr)
         e2 = tool.FE_WGS84 * (2 - tool.FE_WGS84)
@@ -127,7 +148,7 @@ class SinglePointPosition():
 
         pos[2] = np.sqrt(R2 + z * z) - v
 
-        # print(pos)
+        print("POS = ",pos)
         return pos
 
     # 计算伪距残差
@@ -174,8 +195,6 @@ class SinglePointPosition():
         Var = [0, 0, 0, 0, 0, 0, 0, 0, 0]
         count = 0
         while (1):
-            # e矩阵
-            e_matrix = []
             pos = [0, 0, 0]
             for i in range(3):
                 # rr是上一次计算出来的接收机的x、y、z
@@ -184,31 +203,26 @@ class SinglePointPosition():
             dtr = X[3]
             # rr是x，Y,z，pos是ecef的位置
             pos = self.eceftopos(rr, pos)
-            rescode_data = self.rescode(nav_list, OBS_P, rr, pos, err, dtr, V, Var)
-            # vn可用卫星数
-            vn = rescode_data[0]
-            e_matrix = rescode_data[1]
-            Var = rescode_data[2]
-            V = rescode_data[3]
+            spparm = self.rescode(nav_list, OBS_P, rr, pos, err, dtr, V, Var)
             # print("e = ",e_matrix)
-            n = vn
+            n = spparm.vn
             m = 4
             # print(e_matrix)
             # print(V)
             for i in range(n):
                 # 对矩阵进行加权，权重值为每个卫星对应的Var。
-                sig = np.sqrt(Var[i])
-                V[i] /= sig
+                sig = np.sqrt(spparm.Var[i])
+                spparm.V[i] /= sig
                 for j in range(m):
-                    e_matrix[i][j] /= sig
+                    spparm.e_matrix[i][j] /= sig
             # print("e= ", e_matrix)
             # print("V=", V)
             # print(Var)
             n = 4
             k = 4
-            m = vn
+            m = spparm.vn
             # r = [satpos]*dx[dx,dy,dz,dtr]
-            dx = tool.LSP(n, k, m, e_matrix, V, dx)
+            dx = tool.LSP(n, k, m, spparm.e_matrix, spparm.V, dx)
             for i in range(4):
                 X[i] += dx[i]
             # print("X=", X)
@@ -237,19 +251,22 @@ class SinglePointPosition():
                 continue
             #得到伪距矩阵V
             #V[vn] = OBS_P[i] - (r + dtr - tool.CLIGHT * nav_list[i].dts)
-            V[vn] = OBS_P[i] - (r + dtr - tool.CLIGHT * nav_list[i].dts)
+            #dion电离层误差，dtrp对流层误差，未考虑两者的误差
+            dion = 0
+            dtrp = 0
+            V[vn] = OBS_P[i] - (r + dtr - tool.CLIGHT * nav_list[i].dts+dion+dtrp)
             # 将e数组变乘以-1，主要是用于后续最小二乘法中去。并合并到大数组中，得到LSP需要的矩阵H
             for j in range(3):
                 e[j] *= -1
             e_matrix.append(e)
 
-            # iorr
-            # dion
-            # dtorr
-            # dtrp
-            # Var 计算伪距权重。
+            # Var 计算伪距权重。vion是电离层的方差，vtrp是对流层的方差
+            vion = 0.09
+            vtrp = 0.07438
             Var[vn] = 1 * err[0] * err[0] * (err[1] * err[1] + err[2] * err[2]) / np.sin(azel[1]) + nav_list[
-                i].vare + 0.09 + 0.07438
+                i].vare + vion + vtrp
             # print("r = ", r, "e = ",              e)  # nav_list[i].nav.prn,nav_list[i].nav.x,nav_list[i].nav.y,nav_list[i].nav.z,nav_list[i].dts,nav_list[i].vare,V[i],r)
             vn += 1
-        return [vn, e_matrix, Var, V]
+            s = SPPParm()
+            s.init(vn, e_matrix, Var, V)
+        return s
