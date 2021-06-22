@@ -4,8 +4,8 @@ import numpy as np
 '''
 单点定位的原理：ts卫星时间，tu接收机时间，dts是卫星时间与gps时差，dtu接收机与gps时差,P是伪距
 1）P = C*(ts - tu)+C*(dts-dtu)
-2）P（s-u） = C*（ts-tu）是卫星与接收机的几何距离
-3）真实伪距P = P（stu）(t)+C（dts-dtu）+I(t)+T(t)
+2）P(s2u) = C*（ts-tu）是卫星与接收机的几何距离
+3）真实伪距P = P(s2u)+C（dts-dtu）+I(t)+T(t)
 4）P（stu）(t) = sqrt（（Xs- Xu）^2+(Ys-Yu)^2+(Zs -Zu)^2），(Xs,Ys,Zs)是卫星的位置，（Xu，Yu，Zu）是接收机的位置
 5）进行泰勒级数展开并取一次项后：
 P（stu）(t) = (P（stu）(t))0 + (-1*(Xs-Xu)/(P（stu）(t))0 )*dX+(-1*(Ys-Yu)/(P（stu）(t))0 )*dY+(-1*(Zs-Zu)/(P（stu）(t))0 )*dZ
