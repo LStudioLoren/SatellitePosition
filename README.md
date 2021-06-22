@@ -4,10 +4,12 @@
 主要是关于py的一些学习，功能实现的方式等。  
 
 # singlepoint目录：
-CoordinateTransformation.py是XYZ坐标系与BLH坐标系互相转换的功能类。  
-NAVDATA.py是包含将rinex格式的星历文件进行提取转换的方法，并打包成星历类。  
-OBSDATA.py是包含将rinex格式的观测量文件进行提取转换的方法，并打包成观测值类。  
-SATPOS.py是用于计算卫星坐标的方法。  
-singlepoint.py主函数。  
-SINGLEPOINTPOSITION.py是实现单点定位算法。  
-tool.py是包含了一些常用的常参、数学方法等工具。 
+学习并实现卫星的基于伪距的单点定位算法实现。 
+
+CoordinateTransformation.py：XYZ坐标系与BLH坐标系互相转换的功能类。  
+NAVDATA.py：包含将rinex格式的星历文件进行提取转换的方法，并打包成星历类。  
+OBSDATA.py：包含将rinex格式的观测量文件进行提取转换的方法，并打包成观测值类。  
+SATPOS.py：用于计算卫星坐标的方法。  
+singlepoint.py：主函数。  
+SINGLEPOINTPOSITION.py：实现单点定位算法。  
+tool.py：包含了一些常用的常参、数学方法等工具。 
