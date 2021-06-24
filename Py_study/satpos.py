@@ -31,9 +31,9 @@ class Obss():
 class Obs():
     t_obs = 0
     obsary = []
-    def init_obs(self,t_obs,obsary):
+    def init_obs(self,t_obs,obssary):
         self.t_obs = t_obs
-        self.obsary = obsary
+        self.obsary = obssary
 class Nav():
     t_toc = 0
     sys = 0
@@ -122,7 +122,7 @@ def satAzel(pos,e):
     #print("satAzel e = ",e)
     az = 0
     el = np.pi/2
-    enu = []
+    #enu = []
     if pos[2] > -RE_WGS84:
         enu = xyz2enu(pos,e)
         #print("enu = ",enu)

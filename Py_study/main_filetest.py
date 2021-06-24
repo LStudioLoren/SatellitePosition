@@ -5,7 +5,7 @@
 import numpy as np
 import struct
 import binascii
-import CoordinateTransformation
+from singlepoint import CoordinateTransformation
 import MSG.header as Header
 
 
