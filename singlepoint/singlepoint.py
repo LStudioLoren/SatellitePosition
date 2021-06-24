@@ -21,14 +21,14 @@ if __name__ == '__main__':
                 if OBS_DATA[j].obsary[k].prn == nav_data_list[i].prn :
                     # 卫星观测量对应的L1伪距
                     # 整理星历数据打包程nav对象，计算卫星位置pos，计算卫星种差dts，计算卫星位置及时钟方差vare
-                    nav_list.append(SATPOS.SatPos().getSatpos(nav_data_list[i],OBS_DATA[j].t_obs,OBS_DATA[j].obsary[k].p1))
+                    nav_list.append(SATPOS.SatPos().getSatpos(nav_data_list[i],OBS_DATA[j].t_obs,OBS_DATA[j].obsary[k].obsfrefList[0].P))
                 else:
                     continue
 
             #     print("prn :", navData.nav.prn, " x = ", navData.nav.x, " y=", navData.nav.y, " z= ", navData.nav.z, " r = ",
             #       np.sqrt(dot([navData.nav.x, navData.nav.y, navData.nav.z])))
             # print("t_obs = ",OBS_ALL[j].t_obs," prn = ",OBS_ALL[j].obsary[k].prn," p1 = ", OBS_ALL[j].obsary[k].p1)
-            OBS_P.append(OBS_DATA[j].obsary[k].p1)
+            OBS_P.append(OBS_DATA[j].obsary[k].obsfrefList[0].P)
         print("开始处理时间：",time.time())
         X = spp.SinglePointPosition().estpos(nav_list, OBS_P,X)
 
