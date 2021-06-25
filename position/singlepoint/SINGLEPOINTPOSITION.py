@@ -1,5 +1,7 @@
-import tool
+import position.singlepoint.tool as tool
+import position.singlepoint.SATPOS as SATPOS
 import numpy as np
+import time
 #单点定位计算
 '''
 单点定位的原理：ts卫星时间，tu接收机时间，dts是卫星时间与gps时差，dtu接收机与gps时差,P是伪距
@@ -192,9 +194,13 @@ class SinglePointPosition():
     8）将LSP输出的X进行统计dot(dX)，如果小于1E-4，则返回X为最后结果，否则重复2-7
     '''
     def estpos(self,nav_list, OBS_P, last_X):
-        i = 0
         # V是伪距残差数列
-        V = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+        V = []
+        # Var是误差方差（与vare关联）
+        Var = []
+        for i in range(len(nav_list)):
+            V.append(0)
+            Var.append(0)
         # 误差参数
         err = [100, 0.003, 0.003]
 
@@ -203,8 +209,7 @@ class SinglePointPosition():
         X = last_X
         # dx是x,y,z误差
         dx = []
-        # Var是误差方差（与vare关联）
-        Var = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+
         count = 0
         while (1):
             pos = [0, 0, 0]
@@ -266,7 +271,7 @@ class SinglePointPosition():
             #dion电离层误差，dtrp对流层误差，未考虑两者的误差
             dion = 0
             dtrp = 0
-            V[vn] = OBS_P[i] - (r + dtr - tool.CLIGHT * nav_list[i].dts+dion+dtrp)
+            V[vn] = OBS_P[i] - (r + dtr - tool.CLIGHT * nav_list[i].dts + dion + dtrp)
             # 将e数组变乘以-1，主要是用于后续最小二乘法中去。并合并到大数组中，得到LSP需要的矩阵H
             for j in range(3):
                 e[j] *= -1
@@ -282,3 +287,28 @@ class SinglePointPosition():
             s = SPPParm()
             s.init(vn, e_matrix, Var, V)
         return s
+    def exesinglepoint(self,OBS_DATA,nav_data_list):
+        X = [0.0, 0.0, 0.0, 0.0]
+        for j in range(len(OBS_DATA)):
+            OBS_P = []
+            nav_list = []
+            for k in range(len(OBS_DATA[j].obsary)):
+                for i in range(len(nav_data_list)):
+                    # 计算卫星位置；
+                    if OBS_DATA[j].obsary[k].prn == nav_data_list[i].prn:
+                        # 卫星观测量对应的L1伪距
+                        # 整理星历数据打包程nav对象，计算卫星位置pos，计算卫星种差dts，计算卫星位置及时钟方差vare
+                        nav_list.append(SATPOS.SatPos().getSatpos(nav_data_list[i], OBS_DATA[j].t_obs,
+                                                                  OBS_DATA[j].obsary[k].obsfrefList[0].P))
+                    else:
+                        continue
+
+                #     print("prn :", navData.nav.prn, " x = ", navData.nav.x, " y=", navData.nav.y, " z= ", navData.nav.z, " r = ",
+                #       np.sqrt(dot([navData.nav.x, navData.nav.y, navData.nav.z])))
+                # print("t_obs = ",OBS_ALL[j].t_obs," prn = ",OBS_ALL[j].obsary[k].prn," p1 = ", OBS_ALL[j].obsary[k].p1)
+                OBS_P.append(OBS_DATA[j].obsary[k].obsfrefList[0].P)
+            print("开始处理时间：", time.time())
+            X = self.estpos(nav_list, OBS_P, X)
+
+            print("time = ", OBS_DATA[j].t_obs, "  X = ", X)
+            print("结束处理时间：", time.time())

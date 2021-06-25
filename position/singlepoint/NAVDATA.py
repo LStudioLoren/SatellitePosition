@@ -1,4 +1,4 @@
-import tool
+import position.singlepoint.tool as tool
 
 class Nav():
     t_toc = 0
@@ -125,7 +125,7 @@ class NavData():
                 hour = int(line[4])
                 min = int(line[5])
                 sec = float(line[6])
-                gpst = tool.UTC2GPST(year,month,day,hour,min,sec,18)
+                gpst = tool.UTC2GPST(year, month, day, hour, min, sec, 18)
                 lines.append(prn)
                 #lines.append(gpst[0])
                 lines.append(gpst[1])

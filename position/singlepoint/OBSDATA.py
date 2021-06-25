@@ -1,4 +1,4 @@
-import tool
+import position.singlepoint.tool as tool
 
 
 # 单个OBS频点
@@ -62,7 +62,7 @@ class Obs():
 # 初始化OBS数据，最后打包成OBS数据集
 class ObsData():
     def initObsData(self, filepath):
-        fo = open(filepath, mode='r', newline='\r\n')
+        fo = open(filepath, mode='r', newline='\n')
         while True:
             # fo.read()
             line = fo.readline()
@@ -77,23 +77,25 @@ class ObsData():
         gpst = []
         while True:
             line = fo.readline().strip()
+
             if line == "":
                 break
             if line.find(">") != -1:
-                # 读取5个历元数据进行测试。
-                if i == 6:
+                # 读取10个历元数据进行测试。
+                if i == 10:
                     break
                 if i > 0:
                     obs = Obs()
-                    obs.init_obs(gpst[1], obss_line)
+                    obs.init_obs(gpst[1], self.sortObsary(obss_line))
                     obs_line.append(obs)
                     obss_line = []
                 #line = line.split(" ")
                 i += 1
-                gpst = tool.UTC2GPST(int(line[3:6]), int(line[8:9]), int(line[11:12]), int(line[14:15]), int(line[17:18]),
-                                     float(line[20:29]), 18)
+                #print(line)
 
+                gpst = tool.UTC2GPST(int(line[3:6]), int(line[8:9]), int(line[11:12]), int(line[14:15]), int(line[17:18]), float(line[20:29]), 18)
             else:
+
                 line_len = len(line)
                 # print(line_len)
                 if line[:3].find("G") == -1:
@@ -108,10 +110,10 @@ class ObsData():
                 of_list = []
                 for j in range(n):
                     #for j in range([14,18,14,18]):
-
+                    #print(line[4+j*64:17+j*64],line[19+j*64:33+j*64],line[37+j*64:49+j*64],line[50+j*64:67+j*64])
                     of = self.readObsFref(j+1, float(line[4+j*64:17+j*64]),#4:17、68:81
-                                              float(line[18+j*64:35+j*64]),#18:35
-                                              float(line[36+j*64:49+j*64]),#36:49
+                                              float(line[19+j*64:33+j*64]),#18:35
+                                              float(line[37+j*64:49+j*64]),#36:49
                                               float(line[50+j*64:67+j*64]))#50:67
                     of_list.append(of)
                 obss.init_obss2(int(line[:3].replace("G", "")),of_list)
@@ -129,8 +131,24 @@ class ObsData():
         #     for j in range(len(obs_line[i].obsary)):
         #         print(obs_line[i].obsary[j].prn,obs_line[i].obsary[j].p1,obs_line[i].obsary[j].p2)
         return obs_line
+    def sortObsary(self,obsary):
+        #templist = []
+        length = len(obsary)
+        for i in range(len(obsary)-1):
+            minidex = i
+            for j in range((i+1),(length)):
+                if(obsary[j].prn<obsary[minidex].prn):
+                    minidex = j
+            temp = obsary[i]
+            obsary[i] = obsary[minidex]
+            obsary[minidex]=temp
+
+
+            #print(obsary[minidex].prn)
+        return obsary
 
     def readObsFref(self,fref_type,P,L,D,S):
+        #print(P,L,D,S)
         of = Obsfref()
         of.init(fref_type,P,L,D,S)
         return of
