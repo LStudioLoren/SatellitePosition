@@ -1,4 +1,4 @@
-import position.singlepoint.tool as tool
+import position.common.tool as tool
 
 class Nav():
     t_toc = 0

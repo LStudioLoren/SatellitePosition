@@ -1,4 +1,4 @@
-import position.singlepoint.tool as tool
+import position.common.tool as tool
 
 
 # 单个OBS频点
