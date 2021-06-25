@@ -1,5 +1,5 @@
-import position.singlepoint.tool as tool
-import position.singlepoint.SATPOS as SATPOS
+import position.common.tool as tool
+import position.common.SATPOS as SATPOS
 import numpy as np
 import time
 #单点定位计算

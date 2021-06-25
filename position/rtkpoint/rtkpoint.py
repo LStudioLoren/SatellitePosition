@@ -1,6 +1,5 @@
-import time
-
 from position.singlepoint import *
+from position.common import *
 
 
 if __name__ == '__main__':
@@ -8,7 +7,10 @@ if __name__ == '__main__':
     roverObs = OBSDATA.ObsData().initObsData("D:\program\python\SPPositionWithGPSandGLO\data\\rover.21O")
     navDataList = NAVDATA.NavData().initNavData("D:\program\python\SPPositionWithGPSandGLO\data\\nav.21N")
 
-    SINGLEPOINTPOSITION.SinglePointPosition().exesinglepoint(baseObs,navDataList)
+
+
+
+    SINGLEPOINTPOSITION.SinglePointPosition().exesinglepoint(baseObs, navDataList)
     # for i in range(len(baseObs)):
     #     print(baseObs[i].t_obs)
     #     for j in range(len(baseObs[i].obsary)):
