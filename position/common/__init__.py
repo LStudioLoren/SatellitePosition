@@ -2,5 +2,6 @@ __all__=[
     'NAVDATA',
     'OBSDATA',
     'SATPOS',
-    'tool'
+    'tool',
+    'solustion'
 ]

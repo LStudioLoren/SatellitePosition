@@ -49,12 +49,14 @@ class Obss():
 
 # 同一时刻的OBS数据集
 class Obs():
+    gpsweek = 0
     # OBS时刻
     t_obs = 0
     # OBS集
     obsary = []
 
-    def init_obs(self, t_obs, obssary):
+    def init_obs(self, gpsweek,t_obs, obssary):
+        self.gpsweek = gpsweek
         self.t_obs = t_obs
         self.obsary = obssary
 
@@ -86,14 +88,14 @@ class ObsData():
                     break
                 if i > 0:
                     obs = Obs()
-                    obs.init_obs(gpst[1], self.sortObsary(obss_line))
+                    obs.init_obs(gpst[0],gpst[1], self.sortObsary(obss_line))
                     obs_line.append(obs)
                     obss_line = []
                 #line = line.split(" ")
                 i += 1
-                #print(line)
+                #print(2,(line[2:6]), int(line[2:6]),(line[7:9]), int(line[7:9]),(line[10:12]),int(line[10:12]), (line[13:15]),int(line[13:15]), (line[16:18]),int(line[16:18]), (line[19:29]),float(line[19:29]))
 
-                gpst = tool.UTC2GPST(int(line[3:6]), int(line[8:9]), int(line[11:12]), int(line[14:15]), int(line[17:18]), float(line[20:29]), 18)
+                gpst = tool.UTC2GPST(int(line[2:6]), int(line[7:9]), int(line[10:12]), int(line[13:15]), int(line[16:18]), float(line[19:29]), 18)
             else:
 
                 line_len = len(line)

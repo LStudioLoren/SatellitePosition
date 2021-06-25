@@ -1,5 +1,6 @@
 import position.common.tool as tool
 import position.common.SATPOS as SATPOS
+import position.common.solustion as solustion
 import numpy as np
 import time
 #单点定位计算
@@ -193,7 +194,7 @@ class SinglePointPosition():
     7）进行LSP计算，得出dX[dx,dy,dz,dt],并且X+=dX
     8）将LSP输出的X进行统计dot(dX)，如果小于1E-4，则返回X为最后结果，否则重复2-7
     '''
-    def estpos(self,nav_list, OBS_P, last_X):
+    def estpos(self,nav_list, OBS_P, last_X,sol):
         # V是伪距残差数列
         V = []
         # Var是误差方差（与vare关联）
@@ -248,7 +249,8 @@ class SinglePointPosition():
             if np.sqrt(tool.dot(dx) < 1E-4):
                 print("LSP处理次数：", count)
                 break
-        return X
+        sol.update(X,spparm.vn,0)
+        return sol
     #计算出伪距矩阵V、接收机相对于卫星位置的矩阵H（乘以-1）、解算卫星数vn、卫星权重矩阵Var
     def rescode(self,nav_list, OBS_P, rr, pos, err, dtr, V, Var):
         #vn是参与解算卫星数
@@ -292,6 +294,7 @@ class SinglePointPosition():
         for j in range(len(OBS_DATA)):
             OBS_P = []
             nav_list = []
+            sol = solustion.positionsol()
             for k in range(len(OBS_DATA[j].obsary)):
                 for i in range(len(nav_data_list)):
                     # 计算卫星位置；
@@ -308,7 +311,9 @@ class SinglePointPosition():
                 # print("t_obs = ",OBS_ALL[j].t_obs," prn = ",OBS_ALL[j].obsary[k].prn," p1 = ", OBS_ALL[j].obsary[k].p1)
                 OBS_P.append(OBS_DATA[j].obsary[k].obsfrefList[0].P)
             print("开始处理时间：", time.time())
-            X = self.estpos(nav_list, OBS_P, X)
+            sol.init(OBS_DATA[j].gpsweek,OBS_DATA[j].t_obs)
+            sol = self.estpos(nav_list, OBS_P, X,sol)
 
-            print("time = ", OBS_DATA[j].t_obs, "  X = ", X)
+            print("week=",sol.gpsweek,"  time = ", sol.gpssec, "  X = ", sol.X," ns = ",sol.ns,"  age = ",sol.age)
             print("结束处理时间：", time.time())
+            return sol
