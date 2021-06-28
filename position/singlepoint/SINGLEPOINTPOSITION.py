@@ -1,5 +1,8 @@
-import tool
+import position.common.tool as tool
+import position.common.SATPOS as SATPOS
+import position.common.solustion as solustion
 import numpy as np
+
 #单点定位计算
 '''
 单点定位的原理：ts卫星时间，tu接收机时间，dts是卫星时间与gps时差，dtu接收机与gps时差,P是伪距
@@ -147,7 +150,7 @@ class SinglePointPosition():
 
         pos[2] = np.sqrt(R2 + z * z) - v
 
-        print("POS = ",pos)
+        #print("POS = ",pos)
         return pos
 
     # 计算伪距残差
@@ -191,20 +194,23 @@ class SinglePointPosition():
     7）进行LSP计算，得出dX[dx,dy,dz,dt],并且X+=dX
     8）将LSP输出的X进行统计dot(dX)，如果小于1E-4，则返回X为最后结果，否则重复2-7
     '''
-    def estpos(self,nav_list, OBS_P, last_X):
-        i = 0
+    def estpos(self,nav_list, OBS_P, sol):
         # V是伪距残差数列
-        V = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+        V = []
+        # Var是误差方差（与vare关联）
+        Var = []
+        for i in range(len(nav_list)):
+            V.append(0)
+            Var.append(0)
         # 误差参数
         err = [100, 0.003, 0.003]
 
         rr = [0.0, 0.0, 0.0]
         # X是x,y,z,dtr位置
-        X = last_X
+        X = sol.X
         # dx是x,y,z误差
         dx = []
-        # Var是误差方差（与vare关联）
-        Var = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+
         count = 0
         while (1):
             pos = [0, 0, 0]
@@ -243,7 +249,8 @@ class SinglePointPosition():
             if np.sqrt(tool.dot(dx) < 1E-4):
                 print("LSP处理次数：", count)
                 break
-        return X
+        sol.update(X,spparm.vn,0,1)
+        return sol
     #计算出伪距矩阵V、接收机相对于卫星位置的矩阵H（乘以-1）、解算卫星数vn、卫星权重矩阵Var
     def rescode(self,nav_list, OBS_P, rr, pos, err, dtr, V, Var):
         #vn是参与解算卫星数
@@ -266,7 +273,7 @@ class SinglePointPosition():
             #dion电离层误差，dtrp对流层误差，未考虑两者的误差
             dion = 0
             dtrp = 0
-            V[vn] = OBS_P[i] - (r + dtr - tool.CLIGHT * nav_list[i].dts+dion+dtrp)
+            V[vn] = OBS_P[i] - (r + dtr - tool.CLIGHT * nav_list[i].dts + dion + dtrp)
             # 将e数组变乘以-1，主要是用于后续最小二乘法中去。并合并到大数组中，得到LSP需要的矩阵H
             for j in range(3):
                 e[j] *= -1
@@ -282,3 +289,31 @@ class SinglePointPosition():
             s = SPPParm()
             s.init(vn, e_matrix, Var, V)
         return s
+
+    def exesinglepoint(self,OBS_DATA,nav_data_list,sol):
+        OBS_P = []
+        nav_list = []
+        if len(OBS_DATA.obsary) <4 :
+            sol.update(sol.X,len(OBS_DATA.obsary),0,0)
+            return  sol
+        for k in range(len(OBS_DATA.obsary)):
+            for i in range(len(nav_data_list)):
+                # 计算卫星位置；
+                if OBS_DATA.obsary[k].prn == nav_data_list[i].prn:
+                    # 卫星观测量对应的L1伪距
+                    # 整理星历数据打包程nav对象，计算卫星位置pos，计算卫星种差dts，计算卫星位置及时钟方差vare
+                    nav_list.append(SATPOS.SatPos().getSatpos(nav_data_list[i], OBS_DATA.t_obs,
+                                                              OBS_DATA.obsary[k].obsfrefList[0].P))
+                else:
+                    continue
+
+                #     print("prn :", navData.nav.prn, " x = ", navData.nav.x, " y=", navData.nav.y, " z= ", navData.nav.z, " r = ",
+                #       np.sqrt(dot([navData.nav.x, navData.nav.y, navData.nav.z])))
+                # print("t_obs = ",OBS_ALL[j].t_obs," prn = ",OBS_ALL[j].obsary[k].prn," p1 = ", OBS_ALL[j].obsary[k].p1)
+            OBS_P.append(OBS_DATA.obsary[k].obsfrefList[0].P)
+
+        sol.init(OBS_DATA.gpsweek,OBS_DATA.t_obs)
+        sol = self.estpos(nav_list, OBS_P,sol)
+        #print("week=",sol.gpsweek,"  time = ", sol.gpssec, "  X = ", sol.X," ns = ",sol.ns,"  age = ",sol.age)
+
+        return sol

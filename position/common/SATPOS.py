@@ -1,4 +1,4 @@
-import tool
+import position.common.tool as tool
 import numpy as np
 import math as m
 #根据星历、时间、该卫星对应该时刻的L1伪距，计算该颗卫星的位置
@@ -66,7 +66,8 @@ class SatPos():
         dts = navData.a0 + navData.a1 * tk_dts + navData.a2 * tk_dts * tk_dts
         # dts卫星的钟差，钟漂{bias,drift},没有考虑
         # vare用户测距精度，从卫星星历钟的SAV中获取
-        dts = dts - 2 * np.sqrt(tool.GM * navData.Sqrt_A * navData.Sqrt_A) * navData.e * np.sin(Ek) / (tool.CLIGHT * tool.CLIGHT)
+        dts = dts - 2 * np.sqrt(tool.GM * navData.Sqrt_A * navData.Sqrt_A) * navData.e * np.sin(Ek) / (
+                    tool.CLIGHT * tool.CLIGHT)
         vare = navData.SAV * navData.SAV
         # print(navData.prn,"dts = ",dts,"vare = ",vare)
         # print("Xs = ", Xs, " Ys = ", Ys, " Zs = ", Zs)
