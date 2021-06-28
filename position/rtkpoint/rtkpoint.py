@@ -1,7 +1,7 @@
 from position.singlepoint import *
 from position.common import *
 from position.rtkpoint import *
-
+import time
 
 if __name__ == '__main__':
     baseObs = OBSDATA.ObsData().initObsData("D:\program\python\SPPositionWithGPSandGLO\data\\base.21O")
@@ -11,12 +11,11 @@ if __name__ == '__main__':
     nBase = len(baseObs)
     rtkParam = RTKPOSITION.RTKPARAM()
     rtkParam.initRefPoint(-2333329.0760,5383350.5903,2492875.2940)
-
-
-
-
-    rtkParam.sol = SINGLEPOINTPOSITION.SinglePointPosition().exesinglepoint(baseObs, navDataList)
-    print(rtkParam.sol.gpsweek,rtkParam.sol.gpssec,rtkParam.sol.X,rtkParam.sol.ns,rtkParam.sol.age)
+    for i in range(len(roverObs)):
+        print("开始处理时间：", time.time())
+        rtkParam.sol = SINGLEPOINTPOSITION.SinglePointPosition().exesinglepoint(roverObs[i], navDataList,rtkParam.sol)
+        print("GPS week = ",rtkParam.sol.gpsweek," GPS sec = ",rtkParam.sol.gpssec," POS = ",rtkParam.sol.X," NS = ",rtkParam.sol.ns,"AGE = ",rtkParam.sol.age," POS TYPE = ",rtkParam.sol.pos_type)
+        print("结束处理时间：", time.time())
     # for i in range(len(baseObs)):
     #     print(baseObs[i].t_obs)
     #     for j in range(len(baseObs[i].obsary)):

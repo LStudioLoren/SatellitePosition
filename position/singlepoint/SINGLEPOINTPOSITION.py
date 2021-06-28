@@ -2,7 +2,7 @@ import position.common.tool as tool
 import position.common.SATPOS as SATPOS
 import position.common.solustion as solustion
 import numpy as np
-import time
+
 #单点定位计算
 '''
 单点定位的原理：ts卫星时间，tu接收机时间，dts是卫星时间与gps时差，dtu接收机与gps时差,P是伪距
@@ -150,7 +150,7 @@ class SinglePointPosition():
 
         pos[2] = np.sqrt(R2 + z * z) - v
 
-        print("POS = ",pos)
+        #print("POS = ",pos)
         return pos
 
     # 计算伪距残差
@@ -194,7 +194,7 @@ class SinglePointPosition():
     7）进行LSP计算，得出dX[dx,dy,dz,dt],并且X+=dX
     8）将LSP输出的X进行统计dot(dX)，如果小于1E-4，则返回X为最后结果，否则重复2-7
     '''
-    def estpos(self,nav_list, OBS_P, last_X,sol):
+    def estpos(self,nav_list, OBS_P, sol):
         # V是伪距残差数列
         V = []
         # Var是误差方差（与vare关联）
@@ -207,7 +207,7 @@ class SinglePointPosition():
 
         rr = [0.0, 0.0, 0.0]
         # X是x,y,z,dtr位置
-        X = last_X
+        X = sol.X
         # dx是x,y,z误差
         dx = []
 
@@ -249,7 +249,7 @@ class SinglePointPosition():
             if np.sqrt(tool.dot(dx) < 1E-4):
                 print("LSP处理次数：", count)
                 break
-        sol.update(X,spparm.vn,0)
+        sol.update(X,spparm.vn,0,1)
         return sol
     #计算出伪距矩阵V、接收机相对于卫星位置的矩阵H（乘以-1）、解算卫星数vn、卫星权重矩阵Var
     def rescode(self,nav_list, OBS_P, rr, pos, err, dtr, V, Var):
@@ -289,31 +289,31 @@ class SinglePointPosition():
             s = SPPParm()
             s.init(vn, e_matrix, Var, V)
         return s
-    def exesinglepoint(self,OBS_DATA,nav_data_list):
-        X = [0.0, 0.0, 0.0, 0.0]
-        for j in range(len(OBS_DATA)):
-            OBS_P = []
-            nav_list = []
-            sol = solustion.positionsol()
-            for k in range(len(OBS_DATA[j].obsary)):
-                for i in range(len(nav_data_list)):
-                    # 计算卫星位置；
-                    if OBS_DATA[j].obsary[k].prn == nav_data_list[i].prn:
-                        # 卫星观测量对应的L1伪距
-                        # 整理星历数据打包程nav对象，计算卫星位置pos，计算卫星种差dts，计算卫星位置及时钟方差vare
-                        nav_list.append(SATPOS.SatPos().getSatpos(nav_data_list[i], OBS_DATA[j].t_obs,
-                                                                  OBS_DATA[j].obsary[k].obsfrefList[0].P))
-                    else:
-                        continue
+
+    def exesinglepoint(self,OBS_DATA,nav_data_list,sol):
+        OBS_P = []
+        nav_list = []
+        if len(OBS_DATA.obsary) <4 :
+            sol.update(sol.X,len(OBS_DATA.obsary),0,0)
+            return  sol
+        for k in range(len(OBS_DATA.obsary)):
+            for i in range(len(nav_data_list)):
+                # 计算卫星位置；
+                if OBS_DATA.obsary[k].prn == nav_data_list[i].prn:
+                    # 卫星观测量对应的L1伪距
+                    # 整理星历数据打包程nav对象，计算卫星位置pos，计算卫星种差dts，计算卫星位置及时钟方差vare
+                    nav_list.append(SATPOS.SatPos().getSatpos(nav_data_list[i], OBS_DATA.t_obs,
+                                                              OBS_DATA.obsary[k].obsfrefList[0].P))
+                else:
+                    continue
 
                 #     print("prn :", navData.nav.prn, " x = ", navData.nav.x, " y=", navData.nav.y, " z= ", navData.nav.z, " r = ",
                 #       np.sqrt(dot([navData.nav.x, navData.nav.y, navData.nav.z])))
                 # print("t_obs = ",OBS_ALL[j].t_obs," prn = ",OBS_ALL[j].obsary[k].prn," p1 = ", OBS_ALL[j].obsary[k].p1)
-                OBS_P.append(OBS_DATA[j].obsary[k].obsfrefList[0].P)
-            print("开始处理时间：", time.time())
-            sol.init(OBS_DATA[j].gpsweek,OBS_DATA[j].t_obs)
-            sol = self.estpos(nav_list, OBS_P, X,sol)
+            OBS_P.append(OBS_DATA.obsary[k].obsfrefList[0].P)
 
-            print("week=",sol.gpsweek,"  time = ", sol.gpssec, "  X = ", sol.X," ns = ",sol.ns,"  age = ",sol.age)
-            print("结束处理时间：", time.time())
-            return sol
+        sol.init(OBS_DATA.gpsweek,OBS_DATA.t_obs)
+        sol = self.estpos(nav_list, OBS_P,sol)
+        #print("week=",sol.gpsweek,"  time = ", sol.gpssec, "  X = ", sol.X," ns = ",sol.ns,"  age = ",sol.age)
+
+        return sol
