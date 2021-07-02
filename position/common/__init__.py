@@ -3,6 +3,5 @@ __all__=[
     'OBSDATA',
     'SATPOS',
     'tool',
-    'solustion',
-    'RTKCOMMON'
+    'solustion'
 ]
