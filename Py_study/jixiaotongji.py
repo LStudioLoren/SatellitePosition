@@ -2,7 +2,7 @@ import numpy as np
 import struct
 import binascii
 if __name__ == '__main__':
-    fo2 = open("D:\program\python\python-project\project1\data\\2021技术日志-王静龙-fei.txt",mode='r',newline='\r\n')
+    fo2 = open("D:\program\python\SPPositionWithGPSandGLO\data\\no_git_folder\Q2_log.txt",mode='r',newline='\r\n')
     clientList = []
     saleList = []
     hangyeList = []
