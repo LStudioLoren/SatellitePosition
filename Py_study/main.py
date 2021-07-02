@@ -29,6 +29,15 @@ A62A82C1 3D000000 125ACB3F CD9E983F DB664040 00303030 00000000 00000000
 b=bytearray()
 # 按间距中的绿色按钮以运行脚本。
 if __name__ == '__main__':
+    temp = 0
+    for i in range(temp,10):
+        if i ==5 :
+            temp = i+2
+        print(i)
+    x = 10
+    print(x if x>10 else 0)
+    for i in range(1,1):
+        print("12312312312")
     a = "> 2021 01 12 08 21 48.0000000  0 56"
     print(a[2:6],a[7:9],a[10:12],a[13:15],a[16:18],a[19:29])
     #hex1[8] = (0x1B,0x04,0x50,0xB3,0xF2,0x8E,0x49,0x40)

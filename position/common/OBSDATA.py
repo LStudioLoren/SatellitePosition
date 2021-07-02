@@ -95,7 +95,7 @@ class ObsData():
                 i += 1
                 #print(2,(line[2:6]), int(line[2:6]),(line[7:9]), int(line[7:9]),(line[10:12]),int(line[10:12]), (line[13:15]),int(line[13:15]), (line[16:18]),int(line[16:18]), (line[19:29]),float(line[19:29]))
 
-                gpst = tool.UTC2GPST(int(line[2:6]), int(line[7:9]), int(line[10:12]), int(line[13:15]), int(line[16:18]), float(line[19:29]), 0)
+                gpst = tool.UTC2GPST(int(line[2:6]), int(line[7:9]), int(line[10:12]), int(line[13:15]), int(line[16:18]), float(line[19:29]), 18)
             else:
 
                 line_len = len(line)

@@ -36,7 +36,7 @@ class Nav():
 
     # 星历数据
     nav = 0
-    # 钟偏
+    # 钟差
     dts = 0
     # 方差
     vare = 0
@@ -125,7 +125,7 @@ class NavData():
                 hour = int(line[4])
                 min = int(line[5])
                 sec = float(line[6])
-                gpst = tool.UTC2GPST(year, month, day, hour, min, sec, 0)
+                gpst = tool.UTC2GPST(year, month, day, hour, min, sec, 18)
                 lines.append(prn)
                 #lines.append(gpst[0])
                 lines.append(gpst[1])
