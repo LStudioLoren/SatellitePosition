@@ -40,7 +40,7 @@ class RTKPoistion():
         if self.zdres(0,baseObs,len(baseObs.obsary),baseNavList,rtkParam.refPoint,1) != 1:
             return rtkParam.sol
         #获取移动站和基站的公共卫星号、对应各自obs数组的位置。
-        self.selectCommonSat(roverObs,baseObs,nroverObs,nbaseObs)
+        satComList = self.selectCommonSat(roverObs,baseObs,nroverObs,nbaseObs)
 
 
 
@@ -181,8 +181,7 @@ class RTKPoistion():
                     satList.append(roverObs.obsary[i].prn)
                     irover.append(i)
                     ibase.append(j)
-
-        print(satList,irover,ibase)
+        return [satList,irover,ibase]
 
 
 
