@@ -3,13 +3,8 @@ import numpy as np
 import math as m
 #根据星历、时间、该卫星对应该时刻的L1伪距，计算该颗卫星的位置
 class SatPos():
-    def getSatpos(self,navData, t_obs, OBS_P):
-        # 根据观测量的伪距，除以光速，算出时差
-        tttt = OBS_P / tool.CLIGHT
-        # print(tttt)
-        t_obs = t_obs - tttt
-        # 更新星历的toc时间
-        navData.t_toc = navData.toe - tttt
+    def nav2pos(self,t_obs,navData):
+        #navData.t_toc = navData.toe - tttt
         # print(navData.nav.t_toc)
         # 根据开普勒第三定律
         n0 = np.sqrt(tool.GM) / (navData.Sqrt_A * navData.Sqrt_A * navData.Sqrt_A)
@@ -17,10 +12,10 @@ class SatPos():
         n = n0 + navData.Delta_n
         # print("参考时刻TOE的平均角速度n0 = ", n0)
         # print("计算卫星运动的平均角速度n = n0 + delta_n：", n,"  delte_n = ",Delta_n)
-        delta_t = navData.a0 + navData.a1 * (t_obs - navData.t_toc) + navData.a2 * (t_obs - navData.t_toc) * (
-                    t_obs - navData.t_toc)
+        #delta_t = navData.a0 + navData.a1 * (t_obs - navData.t_toc) + navData.a2 * (t_obs - navData.t_toc) * (
+        #        t_obs - navData.t_toc)
         # print("delta_t = ",delta_t)
-        tk = t_obs - navData.toe - delta_t
+        tk = t_obs - navData.toe
         # print("tk = t_obs - delta_t - toe",tk)
         Mk = navData.M0 + n * tk
         # print("信号发射时卫星的平近点角Mk：", Mk,"  M0  = ",M0)
@@ -63,15 +58,47 @@ class SatPos():
         Ys = x * SINL + y * COSiK * COSL
         Zs = y * SINiK
         tk_dts = t_obs - navData.t_toc
+        # dts = self.eph2clk(t_obs,navData_t_toc,navData)
         dts = navData.a0 + navData.a1 * tk_dts + navData.a2 * tk_dts * tk_dts
-        # dts卫星的钟差，钟漂{bias,drift},没有考虑
+        # dts卫星的钟差，钟偏{bias,drift},
         # vare用户测距精度，从卫星星历钟的SAV中获取
         dts = dts - 2 * np.sqrt(tool.GM * navData.Sqrt_A * navData.Sqrt_A) * navData.e * np.sin(Ek) / (
-                    tool.CLIGHT * tool.CLIGHT)
+                tool.CLIGHT * tool.CLIGHT)
         vare = navData.SAV * navData.SAV
-        # print(navData.prn,"dts = ",dts,"vare = ",vare)
-        # print("Xs = ", Xs, " Ys = ", Ys, " Zs = ", Zs)
+        #print(navData.prn, "dts = ", dts, "vare = ", vare)
+        print("Xs = ", Xs, " Ys = ", Ys, " Zs = ", Zs)
         navData.updateParam(Xs, Ys, Zs, dts, vare)
         # navData.updataDtsAndVare()
         # navData.updataVare(vare)
         return navData
+
+    def getSatpos(self,navData, t_obs, OBS_P):
+        # 根据观测量的伪距，除以光速，算出时差
+        tttt = OBS_P / tool.CLIGHT
+        t_sol = t_obs
+        # print(tttt)
+        t_obs = t_obs - tttt
+        #计算广播星历的钟差
+        dt = self.ephclk(t_obs,t_sol,navData)
+        # 更新星历的toc时间,减去钟差
+        t_obs -=dt
+        navData = self.nav2pos(t_obs,navData)
+        return navData
+
+    def eph2clk(self,ts_obs,navData):
+        t = ts = ts_obs - navData.t_toc
+        for i in range(3):
+            t = ts - (navData.a0 + navData.a1 * t + navData.a2 * t * t)
+        #print(ts_obs,navData.t_toc,t)
+        return navData.a0 + navData.a1 * t + navData.a2 * t * t
+
+    def seleph(self):
+        return 0
+
+    def ephclk(self,t_obs_PC,t_obs,navData):
+        #寻找时间最接近的星历数据；
+        self.seleph()
+        #计算广播星历中的卫星种差（clock bias）
+        dt = self.eph2clk(t_obs_PC,navData)
+        #print(dt)
+        return dt
