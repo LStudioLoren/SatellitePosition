@@ -9,8 +9,12 @@ FE_WGS84 = 1 / 298.257223563 # 地球扁率 1/长半轴-短半轴
 RE_WGS84 = 6378137.0   #地球长半轴长度
 
 GM = 3.986005E+14  #引力常数GM
-EARTH_RAD = 7.29211567E-5   #地球自转常数EARTH_RAD
+EARTH_RAD = 7.2921151467E-5   #地球自转常数EARTH_RAD
 
+#L1的频率
+FREQ1 = 1.57542E9
+#L2的频率
+FREQ2 = 1.22760E9
 def dot(rr):
     return rr[0]*rr[0]+rr[1]*rr[1]+rr[2]*rr[2]
 def dot2(rr):
@@ -53,6 +57,7 @@ eX = P-r
 X = (e*e_t)^-1(P-r)*e_t
 
 '''
+
 def LSP(n,k,m,A,y,C):
     #A*dx=y[p-r]  -》A*dx-y = 0
     #根据矩阵
@@ -65,7 +70,49 @@ def LSP(n,k,m,A,y,C):
     Q_1 = np.linalg.inv(Q)
     C = mulmatirix_signle(n,1,n,Q_1,Ay)
     return C
-#计算从UTC时转GPS时，且GPS从1980年1月6日开始计算。
+
+def dayofyear(ep):
+    dayofyear = 0
+    for i in range(1,ep[1]):
+        if i==1 or i==3 or i==5 or i==7 or i==8 or i==10 or i==12:
+            dayofyear+=31
+        elif i==4 or i==6 or i==9 or i==11:
+            dayofyear+=30
+        elif i==2 :
+            if (ep[0] % 4 == 0 and ep[0] % 100 != 0) or ep[0] % 400 == 0:
+                dayofyear += 29
+            else:
+                dayofyear += 28
+
+    dayofyear = dayofyear + ep[2] + ep[3]/24 + ep[4]/1440 +ep[5]/86400
+    return dayofyear
+
+def GPST2EPOCH(gpsweek,gpssec):
+    mday = [31,29,31,30,31,30,31,31,30,31,30,31,
+           31,28,31,30,31,30,31,31,30,31,30,31,
+           31,28,31,30,31,30,31,31,30,31,30,31,
+           31,28,31,30,31,30,31,31,30,31,30,31]
+    days = (gpsweek*7+6)+int(gpssec/86400)
+    sec = np.mod(gpssec,86400)
+    day = np.mod(days, 1461)
+    ep = [0,0,0,0,0,0]
+    for mon in range(48):
+
+        if day >= mday[mon]:
+            day -= mday[mon]
+        else:
+            break
+    ep[0] = 1980+int(days/1461)*4+int(mon/12)
+    ep[1] = np.mod(mon,12)+1
+    ep[2] = day
+    ep[3] = int(sec / 3600)
+    ep[4] = int(np.mod(sec,3600)/60)
+    ep[5] = np.mod(sec,60)
+    print(ep)
+    return ep
+#将年月日时分秒，转为GPS周+周秒，且GPS从1980年1月6日开始计算。
+#当leapsec为0时，表示将rinex中的gps年月日时分秒转为周秒格式
+#当leapsec不为0时，表示将UTC时转换为gps周、周秒
 def UTC2GPST(year,month,day,hour,min,sec,leapsec):
     DayOfYear = 0
     DayOfMonth = 0
