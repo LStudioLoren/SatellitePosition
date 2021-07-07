@@ -41,26 +41,11 @@ def eceftopos(rr, blhpos):
 
     #print("POS = ",pos)
     return blhpos
-#将卫星的x、y、z坐标系转换为enu坐标系，公式是固定的；
-    #pos是接收机的BLH，e是接收机相对于卫星的几何向量
-def xyz2enu(pos, e):
+
+def ecef2enu(pos,e):
     enu = []
     E9 = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    # xyz2enu
-    SINP = np.sin(pos[0])
-    COSP = np.cos(pos[0])
-    SINL = np.sin(pos[1])
-    COSL = np.cos(pos[1])
-    E9[0] = -SINL
-    E9[1] = -SINP * COSL
-    E9[2] = COSP * COSL
-    E9[3] = COSL
-    E9[4] = -SINP * SINL
-    E9[5] = COSP * SINL
-    E9[6] = 0.0
-    E9[7] = COSP
-    E9[8] = SINP
-
+    E9 = xyz2enu(pos,E9)
     n = 3
     k = 1
     m = 3
@@ -80,6 +65,27 @@ def xyz2enu(pos, e):
     # print(enu)
     # print("asdfa enu =  [0.9832349746631751, -0.0017021136149081018, 0.18233509647993557]")
     return enu
+#将卫星的x、y、z坐标系转换为enu坐标系，公式是固定的；
+    #pos是接收机的BLH，e是接收机相对于卫星的几何向量
+def xyz2enu(pos,E9):
+
+    # xyz2enu
+    SINP = np.sin(pos[0])
+    COSP = np.cos(pos[0])
+    SINL = np.sin(pos[1])
+    COSL = np.cos(pos[1])
+    E9[0] = -SINL
+    E9[1] = -SINP * COSL
+    E9[2] = COSP * COSL
+    E9[3] = COSL
+    E9[4] = -SINP * SINL
+    E9[5] = COSP * SINL
+    E9[6] = 0.0
+    E9[7] = COSP
+    E9[8] = SINP
+    return E9
+
+
 
 # 计算卫星的对应测量点的方位角；这是固定算法，需要将
 def satAzel(blhpos, e):
@@ -89,7 +95,7 @@ def satAzel(blhpos, e):
     # enu = []
     #print("blh pos = ",pos)
     if blhpos[2] > -tool.RE_WGS84:
-        enu = xyz2enu(blhpos, e)
+        enu = ecef2enu(blhpos, e)
         #print("enu = ",enu)
         if enu[0] * enu[0] + enu[1] * enu[1] < 1E-12:
             az = 0
@@ -105,7 +111,7 @@ def satAzel(blhpos, e):
 def r_corr(nav, rr):
 
     r = np.sqrt(tool.dot([nav.x - rr[0], nav.y - rr[1], nav.z - rr[2]]))
-    print("r_corr : " ,r)
+    #print("r_corr : " ,r)
     # 再加上
     r += tool.OMGE * (nav.x * rr[1] - nav.y * rr[0]) / tool.CLIGHT
     return r

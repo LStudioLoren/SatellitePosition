@@ -2,17 +2,42 @@ from position.singlepoint import SINGLEPOINTPOSITION
 from position.common import *
 import numpy as np
 class RTKPARAM():
-    #基站坐标，ECEF-XYZ
-    refPoint = []
-    #rtk状态
-    rtkStatus = 0
-    #解状态
-    sol = solustion.positionsol()
+    def __init__(self):
+        # 基站坐标，ECEF-XYZ
+        self.refPoint = [0.0,0.0,0.0,0.0,0.0,0.0]
+        # rtk状态
+        self.rtkStatus = 0
+        # 解状态
+        self.sol = solustion.positionsol()
+
+        self.nx = 243
+        self.na = 9
+        self.tt = 0.0
+        self.x = []
+        self.P = []
+        self.xa = []
+        self.Pa = []
+        self.nfix = 0
+        self.neb = 0
+
+        for i in range(self.nx):
+            self.x.append([0])
+            self.xa.append([0])
+            plist = []
+            palist = []
+            for j in range(self.nx):
+                plist.append(0)
+                palist.append(0)
+            self.P.append(plist)
+            self.Pa.append(palist)
+
 
     def initRefPoint(self,X,Y,Z):
         self.refPoint = (X,Y,Z)
     def updateSol(self,sol):
         self.sol = sol
+    def getrr(self):
+        return [self.x[0][0],self.x[1][0],self.x[2][0]]
 
 
 class RTKPoistion():
@@ -34,14 +59,15 @@ class RTKPoistion():
         nbaseObs = len(baseObs.obsary)
         nroverObs = len(roverObs.obsary)
 
-        #roverNavList = self.getNavList(roverObs,navDataList)
+        roverNavList = self.getNavList(roverObs,navDataList)
 
         #进行基站的非差残差计算
         if self.zdres(0,baseObs,len(baseObs.obsary),baseNavList,rtkParam.refPoint,1) != 1:
             return rtkParam.sol
         #获取移动站和基站的公共卫星号、对应各自obs数组的位置。
         satComList = self.selectCommonSat(roverObs,baseObs,nroverObs,nbaseObs)
-
+        satlist = []
+        self.updateState(rtkParam,satlist,satComList[1],satComList[2],satComList[0],baseNavList,roverNavList)
 
 
 
@@ -53,7 +79,7 @@ class RTKPoistion():
                 if obs.obsary[k].prn == navDataList[i].prn:
                     # 卫星观测量对应的L1伪距
                     # 整理星历数据打包程nav对象，计算卫星位置pos，计算卫星种差dts，计算卫星位置及时钟方差vare
-                    print("卫星:",navDataList[i].prn,"位置：")
+                    #print("卫星:",navDataList[i].prn,"位置：")
                     navList.append(SATPOS.SatPos().getSatpos(navDataList[i], obs.t_obs,
                                                                  obs.obsary[k].obsfrefList[0].P))
                 else:
@@ -71,7 +97,7 @@ class RTKPoistion():
             for j in range(nfre*2):
                 y_obs.append(0)
             y.append(y_obs)
-        print(y[0],y[0][1])
+        #print(y[0],y[0][1])
         if tool.dot(rr) <=0 :
             return 0
         rr_ = rr
@@ -91,11 +117,11 @@ class RTKPoistion():
                 continue
 
             r += (-tool.CLIGHT)* navList[i].dts
-            print(r)
+            #print(r)
             zhd = self.tropmodel(obs.t_obs,pos,[0,90*np.pi/180],0)
             tropnmf = self.tropmapf_nmf(obs.gpsweek,obs.t_obs,pos,azel,0)
             r += tropnmf*zhd
-            print(r,tropnmf,zhd)
+            #print(r,tropnmf,zhd)
             for j in range(len(obs.obsary[i].obsfrefList)):
                 #for k in range():
                 if (obs.obsary[i].obsfrefList[j].L > 0.0) :
@@ -182,6 +208,93 @@ class RTKPoistion():
                     irover.append(i)
                     ibase.append(j)
         return [satList,irover,ibase]
+
+    def updateState(self,rtkParam,satList,irover,ibase,ns,baseNav,roverNav):
+        tt = np.fabs(rtkParam.tt);
+        self.updos(rtkParam,tt)
+        print()
+
+    def initX(self,rtkParam,xi,var,i):
+        rtkParam.x[i][0] = xi
+        for j in range(rtkParam.nx):
+            a = (var if i==j else 0)
+            rtkParam.P[j][i] = a
+            rtkParam.P[i][j] = a
+
+
+    def updos(self,rtkParam,tt):
+        Q = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
+        pos = [0.0,0.0,0.0]
+        prn = [ 1E-4,1E-3,1E-4,1E-1,1E-2 ,0.0]
+        if(tool.dot(rtkParam.getrr()) <= 0.0):
+            for i in range(3):
+                self.initX(rtkParam,rtkParam.sol.rr[i],30*30,i)
+
+            for i in range(3,6):
+                self.initX(rtkParam,rtkParam.sol.rr[i],10*10,i)
+
+            for i in range(6,9):
+                self.initX(rtkParam,1E-6,10*10,i)
+        variance = 0
+        for i in range(3):
+            variance += rtkParam.P[i][i]
+        variance /= 3
+
+        if variance > 30*30 :
+            print()
+
+        F = tool.eyeMat(rtkParam.nx)
+        for i in range(6):
+            F[i+3][i] = tt
+        #FP = tool.zeroMat(rtkParam.nx,rtkParam.nx)
+        #xp = tool.zeroMat(rtkParam.nx,1)
+
+        for i in range(6):
+            F[i][i+3] = tt
+        #print(rtkParam.x)
+        xp = tool.mulmatirix(rtkParam.nx,1,rtkParam.nx,F,rtkParam.x,"TN")
+        FP = tool.mulmatirix(rtkParam.nx,rtkParam.nx,rtkParam.nx,F,rtkParam.P,"TN")
+        rtkParam.P = tool.mulmatirix(rtkParam.nx,rtkParam.nx,rtkParam.nx,FP,F,"TT")
+        rtkParam.x = xp
+        Q[0] = Q[4] = prn[3]*prn[3]
+        Q[8] = prn[4]*prn[4]
+        Qv=[]
+        pos = RTKCOMMON.eceftopos(rtkParam.getrr(),pos)
+        pos = [0.40407093076627232, 1.9797683819037855, 20.058078320696950]
+        Qv = self.convEcef(pos,Q,Qv)
+        for i in range(3):
+            for j in range(3):
+                rtkParam.P[i+6][j+6] += Qv[i+j*3]
+        print(rtkParam.x)
+
+    def convEcef(self,pos,Q,Qv):
+        E = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        EQ= []
+        E = RTKCOMMON.xyz2enu(pos,E)
+        #E^T *Q,
+        for i in range(3):
+            #dl = []
+            for j in range(3):
+                d = 0
+                for k in range(3):
+                    d += E[k+i*3]*Q[k+j*3]
+                    print("E[",k+i*3,"]*Q[",k+j*3,"]")
+                EQ.append(d)
+        #EQ^T *E
+        for i in range(3):
+            for j in range(3):
+                d = 0
+                for k in range(3):
+                    d += EQ[k+i*3]*E[k+j*3]
+                Qv.append(d)
+        return Qv
+            #EQ.append()
+
+
+
+
+
+
 
 
 

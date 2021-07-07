@@ -66,7 +66,7 @@ class SatPos():
                 tool.CLIGHT * tool.CLIGHT)
         vare = navData.SAV * navData.SAV
         #print(navData.prn, "dts = ", dts, "vare = ", vare)
-        print("Xs = ", Xs, " Ys = ", Ys, " Zs = ", Zs)
+        #print("Xs = ", Xs, " Ys = ", Ys, " Zs = ", Zs)
         navData.updateParam(Xs, Ys, Zs, dts, vare)
         # navData.updataDtsAndVare()
         # navData.updataVare(vare)

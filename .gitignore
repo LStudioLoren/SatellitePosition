@@ -1,3 +1,4 @@
 # 项目排除路径
 /venv/
 /data/no_git_folder/
+/position/test/

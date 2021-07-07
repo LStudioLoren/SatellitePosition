@@ -14,8 +14,8 @@
 - OBSDATA.py：包含将rinex格式的观测量文件进行提取转换的方法，并打包成观测值类。  
 - SATPOS.py：用于计算卫星坐标的方法。
 - tool.py：包含了一些常用的常参、数学方法等工具。
-- solution.py：包含定位结果、历元时间、解算卫星数、定位状态、age等信息
-
+- solution.py：包含定位结果、历元时间、解算卫星数、定位状态、age等信息。
+- RTKCOMMON.py：包含定位算法需要用到的公共方法。
 ### 2、singlepoint目录
 - \_\_init\_\_：初始化类
 - singlepoint.py：主函数。  

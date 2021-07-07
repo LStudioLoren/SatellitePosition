@@ -49,6 +49,13 @@ class SPPParm():
         self.e_matrix = e
         self.Var = var
         self.V = v
+    def reV(self):
+        Vl = []
+
+        for i in range(len(self.V)):
+            Vl.append([self.V[i]])
+        self.V = Vl
+        return self
 
 
 # 单点定位算法类
@@ -95,7 +102,8 @@ class SinglePointPosition():
             dtr = X[3]
             # rr是x，Y,z，pos是blh的位置
             pos = RTKCOMMON.eceftopos(rr, pos)
-            spparm = self.rescode(nav_list, OBS_P, rr, pos, err, dtr, V, Var)
+            #reV是将V数组从一维数组，重整为n行1列的二维数组
+            spparm = self.rescode(nav_list, OBS_P, rr, pos, err, dtr, V, Var).reV()
             # print("e = ",e_matrix)
             n = spparm.vn
             m = 4
@@ -104,7 +112,7 @@ class SinglePointPosition():
             for i in range(n):
                 # 对矩阵进行加权，权重值为每个卫星对应的Var。
                 sig = np.sqrt(spparm.Var[i])
-                spparm.V[i] /= sig
+                spparm.V[i][0] /= sig
                 for j in range(m):
                     spparm.e_matrix[i][j] /= sig
             # print("e= ", e_matrix)
@@ -113,12 +121,11 @@ class SinglePointPosition():
             n = 4
             k = 4
             m = spparm.vn
-            # r = [satpos]*dx[dx,dy,dz,dtr]
+
             dx = tool.LSP(n, k, m, spparm.e_matrix, spparm.V, dx)
             for i in range(4):
                 X[i] += dx[i]
-            # print("X=", X)
-            # print("dx=", dx)
+
             count += 1
             if np.sqrt(tool.dot(dx) < 1E-4):
                 print("LSP处理次数：", count)

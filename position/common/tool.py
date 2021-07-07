@@ -20,6 +20,67 @@ def dot(rr):
 def dot2(rr):
     return rr[0]*rr[0]+rr[1]*rr[1]
 
+def zeroMat(n,m):
+    A =[]
+    for i in range(n):
+        B = []
+        for j in range(m):
+            B.append(0)
+        A.append(B)
+    return A
+
+def eyeMat(n):
+    A = zeroMat(n,n)
+    for i in range(n):
+        A[i][i] = 1
+    return A
+
+#n列*m行  *  k列*m行
+def mulmatirix(n,k,m,A,B,type):
+    C = []
+    if type == "NN":
+        #n == m
+        for i in range(n):
+            dlist = []
+            for j in range(k):
+                d = 0
+                for x in range(m):
+                    d+=A[i][x]*B[x][j]
+                dlist.append(d)
+            C.append(dlist)
+    #NT,k ==n
+    elif type == "NT":
+        for i in range(n):
+            dlist = []
+            for j in range(k):
+                d = 0
+                for x in range(m):
+                    d+=A[i][x]*B[j][x]
+                dlist.append(d)
+            C.append(dlist)
+    elif type =="TN":
+        for i in range(n):
+            dlist = []
+            for j in range(k):
+                d = 0
+                for x in range(m):
+                    d+=A[x][i]*B[x][j]
+                dlist.append(d)
+            C.append(dlist)
+    elif type == "TT":
+        for i in range(n):
+            dlist = []
+            for j in range(k):
+                d = 0
+                for x in range(m):
+                    d+=A[x][i]*B[j][x]
+                dlist.append(d)
+            C.append(dlist)
+    return C
+
+
+
+
 #这里的得出来的是A的倒转*B矩阵，
 def mulmatirix_signle(n,k,m,A,B):
     C = []
@@ -59,17 +120,25 @@ X = (e*e_t)^-1(P-r)*e_t
 '''
 
 def LSP(n,k,m,A,y,C):
+    #dx = (A^T*A)^-1  *  (A^T *y)
     #A*dx=y[p-r]  -》A*dx-y = 0
     #根据矩阵
-    #Ay = A*y
-    Ay = mulmatirix_signle(n,1,m,A,y)
-    #Q = A*A'
-    Q = mulmatirix_multi(n,k,m,A,A)
+    #Ay = A^T*y,A^T的倒转*y
+    Ay = mulmatirix(n,1,m,A,y,"TN")
+    #Q = A^t*A
+    #Q = mulmatirix_multi(n,k,m,A,A)
+    Q = mulmatirix(n,k,m,A,A,"TN")
     #Q_1 = Q inv,Q-1
-    #这个是将A*A的倒转求逆
+    #这个是将A^T*A求逆
     Q_1 = np.linalg.inv(Q)
-    C = mulmatirix_signle(n,1,n,Q_1,Ay)
-    return C
+    #这里是求Q^-1 * Ay
+    C = mulmatirix(n,1,n,Q_1,Ay,"NN")
+    #C数组是 一个 n列*1行的二维数组，因此此次将其重新编辑为一维数组
+    C2 = []
+    for i in range(len(C)):
+        C2.append(C[i][0])
+    #print("C",C2)
+    return C2
 
 def dayofyear(ep):
     dayofyear = 0
@@ -108,7 +177,7 @@ def GPST2EPOCH(gpsweek,gpssec):
     ep[3] = int(sec / 3600)
     ep[4] = int(np.mod(sec,3600)/60)
     ep[5] = np.mod(sec,60)
-    print(ep)
+    #print(ep)
     return ep
 #将年月日时分秒，转为GPS周+周秒，且GPS从1980年1月6日开始计算。
 #当leapsec为0时，表示将rinex中的gps年月日时分秒转为周秒格式
