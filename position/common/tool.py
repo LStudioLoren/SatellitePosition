@@ -2,7 +2,8 @@ import numpy as np
 import math as m
 from scipy import linalg
 #工具集
-
+MAXSAT = 116
+MAXFREF =243
 CLIGHT =299792458.0  #光速
 OMGE=7.2921151467E-5  #
 FE_WGS84 = 1 / 298.257223563 # 地球扁率 1/长半轴-短半轴
@@ -15,6 +16,15 @@ EARTH_RAD = 7.2921151467E-5   #地球自转常数EARTH_RAD
 FREQ1 = 1.57542E9
 #L2的频率
 FREQ2 = 1.22760E9
+def dot_n(rr,n):
+    r = 0
+    for i in range(n):
+        r+= rr[i]*rr[i]
+    return r
+def norm(rr,n):
+    return np.sqrt(dot_n(rr,n))
+
+
 def dot(rr):
     return rr[0]*rr[0]+rr[1]*rr[1]+rr[2]*rr[2]
 def dot2(rr):

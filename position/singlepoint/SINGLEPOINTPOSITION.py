@@ -35,20 +35,33 @@ DX = (eT*e)^-1*eT（P-r）
 
 # LSP参数类
 class SPPParm():
-    # 参与解算卫星数据
-    vn = 0
-    # 几何矩阵
-    e_matrix = []
-    # 伪距矩阵
-    V = []
-    # 加权矩阵
-    Var = []
+    def __init__(self):
+        # 参与解算卫星数据
+        self.vn = 0
+        # 几何矩阵
+        self.e_matrix = []
+        # 伪距矩阵
+        self.V = []
+        # 加权矩阵
+        self.Var = []
+        # 卫星方位、截止角
+        self.azel = []
+        # 可用卫星
+        self.vsat = []
+        # 伪距残差
+        self.resp = []
 
-    def init(self, vn, e, var, v):
+        self.sol = solustion.positionsol()
+
+    def init(self, vn, e, var, v,azelList ,vsatList,respList):
         self.vn = vn
         self.e_matrix = e
         self.Var = var
         self.V = v
+        self.azel = azelList
+        self.vsat = vsatList
+        self.resp = respList
+
     def reV(self):
         Vl = []
 
@@ -75,7 +88,7 @@ class SinglePointPosition():
     8）将LSP输出的X进行统计dot(dX)，如果小于1E-4，则返回X为最后结果，否则重复2-7
     '''
 
-    def estpos(self, nav_list, OBS_P, sol):
+    def estpos(self, nav_list, OBS_DATA, sol):
         # V是伪距残差数列
         V = []
         # Var是误差方差（与vare关联）
@@ -103,7 +116,7 @@ class SinglePointPosition():
             # rr是x，Y,z，pos是blh的位置
             pos = RTKCOMMON.eceftopos(rr, pos)
             #reV是将V数组从一维数组，重整为n行1列的二维数组
-            spparm = self.rescode(nav_list, OBS_P, rr, pos, err, dtr, V, Var).reV()
+            spparm = self.rescode(nav_list, OBS_DATA, rr, pos, err, dtr, V, Var,sol.gpssec).reV()
             # print("e = ",e_matrix)
             n = spparm.vn
             m = 4
@@ -121,7 +134,8 @@ class SinglePointPosition():
             n = 4
             k = 4
             m = spparm.vn
-
+            print(spparm.e_matrix)
+            print(spparm.V)
             dx = tool.LSP(n, k, m, spparm.e_matrix, spparm.V, dx)
             for i in range(4):
                 X[i] += dx[i]
@@ -131,48 +145,150 @@ class SinglePointPosition():
                 print("LSP处理次数：", count)
                 break
         sol.update(X, spparm.vn, 0, 1)
-        return sol
+        spparm.sol = sol
+        #rtkParam.updateSol(sol)
+
+        return spparm
 
     # 计算出伪距矩阵V、接收机相对于卫星位置的矩阵H（乘以-1）、解算卫星数vn、卫星权重矩阵Var
-    def rescode(self, nav_list, OBS_P, rr, pos, err, dtr, V, Var):
+    def rescode(self, nav_list, OBS_DATA, rr, pos, err, dtr, V, Var,t_obs):
         # vn是参与解算卫星数
         vn = 0
         e_matrix = []
+        vsatList = []
+        azelList = []
+        respList = []
         for i in range(len(nav_list)):
+            vsatList.append(0)
+            azelList.append([0.0,0.0])
+            respList.append(0)
             # 伪距修正，根据卫星位置，减去估算的用户位置
             r = RTKCOMMON.r_corr(nav_list[i], rr)  # [nav_list[i].nav.x,nav_list[i].nav.y,nav_list[i].nav.z]
             # 计算接收机相对于卫星位置的向量数组
             e = RTKCOMMON.e_corr(nav_list[i], rr)
             # 计算卫星的方位角和截止角
 
-            azel = RTKCOMMON.satAzel(pos, e)
+            azelList[i] = RTKCOMMON.satAzel(pos, e)
 
             # 小于10度截止的的就不参与解算。
-            if azel[1] < 0.173:
+            if azelList[i][1] < 0.173:
                 continue
             # 得到伪距矩阵V
             # V[vn] = OBS_P[i] - (r + dtr - tool.CLIGHT * nav_list[i].dts)
             # dion电离层误差，dtrp对流层误差，未考虑两者的误差
-            dion = 0
-            dtrp = 0
-            V[vn] = OBS_P[i] - (r + dtr - tool.CLIGHT * nav_list[i].dts + dion + dtrp)
+            #        *ion=ionmodel(time,nav->ion_gps,pos,azel);
+            #*var=SQR(*ion*ERR_BRDCI);
+            #return 1;
+            ionCorr = self.ionocorr(t_obs,pos,azelList[i],1)
+            tropCorr = self.tropcorr(t_obs,pos,azelList[i],1)
+            pCorr = self.prange(OBS_DATA,nav_list,azelList[i],i)
+            #dtrp = 0
+            print("P =",pCorr[0], "  r=  ",r,"  ")
+            V[vn] = pCorr[0] - (r + dtr - tool.CLIGHT * nav_list[i].dts + ionCorr[0] + tropCorr[0])
             # 将e数组变乘以-1，主要是用于后续最小二乘法中去。并合并到大数组中，得到LSP需要的矩阵H
             for j in range(3):
                 e[j] *= -1
             e_matrix.append(e)
 
+            vsatList[i] = 1
+            respList[i] = V[vn]
+
             # Var 计算伪距权重。vion是电离层的方差，vtrp是对流层的方差
-            vion = 0.09
-            vtrp = 0.07438
-            Var[vn] = 1 * err[0] * err[0] * (err[1] * err[1] + err[2] * err[2]) / np.sin(azel[1]) + nav_list[
-                i].vare + vion + vtrp
+            #vion = 0.09
+            #vtrp = 0.07438
+            Var[vn] = 1 * err[0] * err[0] * (err[1] * err[1] + err[2] * err[2]/ np.sin(azelList[i][1])) + nav_list[
+                i].vare +pCorr[1] + ionCorr[1] + tropCorr[1]
             # print("r = ", r, "e = ",              e)  # nav_list[i].nav.prn,nav_list[i].nav.x,nav_list[i].nav.y,nav_list[i].nav.z,nav_list[i].dts,nav_list[i].vare,V[i],r)
             vn += 1
             s = SPPParm()
-            s.init(vn, e_matrix, Var, V)
+            s.init(vn, e_matrix, Var, V,azelList,vsatList,respList)
+        #print("V[nv]",V)
         return s
+    def prange(self,obs,nav,azel,iter):
+        P1 = obs.obsary[iter].obsfrefList[0].P
+        #P2 = obs.obsary[iter].obsfrefList[1].P
+        #lam = [tool.CLIGHT / tool.FREQ1, tool.CLIGHT / tool.FREQ2]
+        #gamma
+        var = 0.3*0.3
 
-    def exesinglepoint(self, OBS_DATA, nav_data_list, sol):
+        b1= nav[iter].TGD *tool.CLIGHT #/ * TGD (m) * /
+        return [P1 - b1,var]
+
+    def tropcorr(self,t_obs,pos,azel,troptype):
+
+        trop =0
+        var = 0
+        if troptype == 1:
+            temp0 = 15.0 #/ *temparature at sea level * /
+            humi = 0.7
+
+
+            if (pos[2] < -100.0 or 1E4 < pos[2] or azel[1] <= 0) :
+                trop = 0
+            else:
+                #/ *standard atmosphere * /
+                hgt = 0.0 if pos[2] < 0.0 else pos[2]
+
+                pres = 1013.25 * np.power(1.0 - 2.2557E-5 * hgt, 5.2568)
+                temp = temp0 - 6.5E-3 * hgt + 273.16;
+                e = 6.108 * humi * np.exp((17.15 * temp - 4684.0) / (temp - 38.45))
+
+                #/ *saastamoninen model * /
+                z = np.pi / 2.0 - azel[1]
+                trph = 0.0022768 * pres / (1.0 - 0.00266 * np.cos(2.0 * pos[0]) - 0.00028 * hgt / 1E3) / np.cos(z);
+                trpw = 0.002277 * (1255.0 / temp + 0.05) * e / np.cos(z);
+                trop = trph + trpw
+        var = (0.3 / (np.sin(azel[1]) +0.1))*(0.3 / (np.sin(azel[1]) +0.1))
+        return [trop,var]
+    def ionocorr(self,t_obs,pos,azel,iontype):
+        ion = 0
+        var = 0
+        if iontype == 1:
+            #2004/1/1
+            ion2 = [0,0,0,0,0,0,0,0]
+            ion_default= [0.1118E-07, -0.7451E-08, -0.5961E-07, 0.1192E-06,
+                            0.1167E+06, -0.2294E+06, -0.1311E+06, 0.1049E+07]
+            tt = f = psi = phi = lam = amp = per = x = week = 0
+
+            if (pos[2] < -1E3 or azel[1] <= 0):
+                ion = 0
+            else:
+                if (tool.norm(ion2, 8) <= 0.0):
+                    ion2=ion_default
+
+                #earth centered angle(semi - circle) * /
+                psi = 0.0137 / (azel[1] / np.pi + 0.11) - 0.022
+
+                #/ *subionospheric latitude / longitude(semi - circle) * /
+                phi = pos[0] / np.pi + psi * np.cos(azel[0])
+                if (phi > 0.416) :
+                    phi = 0.416
+                elif (phi < -0.416):
+                    phi = -0.416
+
+                lam = pos[1] / np.pi + psi * np.sin(azel[0]) / np.cos(phi * np.pi)
+
+                #/ *geomagnetic latitude(semi - circle) * /
+                phi += 0.064 * np.cos((lam - 1.617) * np.pi)
+                #/ *local time(s) * /
+                tt = 43200.0 * lam + t_obs
+                tt -= np.floor(tt / 86400.0) * 86400.0 # / *0 <= tt < 86400 * /
+
+                #/ *slant factor * /
+                f = 1.0 + 16.0 * pow(0.53 - azel[1] / np.pi, 3.0)
+
+                #/ *ionospheric delay * /
+                amp = ion2[0] + phi * (ion2[1] + phi * (ion2[2] + phi * ion2[3]));
+                per = ion2[4] + phi * (ion2[5] + phi * (ion2[6] + phi * ion2[7]));
+                amp = 0.0 if amp < 0.0 else  amp
+                per = 72000.0 if per < 72000.0 else  per
+                x = 2.0 * np.pi * (tt - 50400.0) / per
+                ion = tool.CLIGHT * f * ( (5E-9+amp * (1.0+x * x * (-0.5+x * x / 24.0))) if np.fabs(x) < 1.57 else 5E-9)
+        var = ion *0.5 *ion*0.5
+        print("[ion,var]",ion,var)
+        return [ion,var]
+    def exesinglepoint(self, OBS_DATA, nav_data_list, rtkParam):
+        sol = rtkParam.sol
         OBS_P = []
         nav_list = []
         if len(OBS_DATA.obsary) < 4:
@@ -192,10 +308,24 @@ class SinglePointPosition():
                 #     print("prn :", navData.nav.prn, " x = ", navData.nav.x, " y=", navData.nav.y, " z= ", navData.nav.z, " r = ",
                 #       np.sqrt(dot([navData.nav.x, navData.nav.y, navData.nav.z])))
                 # print("t_obs = ",OBS_ALL[j].t_obs," prn = ",OBS_ALL[j].obsary[k].prn," p1 = ", OBS_ALL[j].obsary[k].p1)
-            OBS_P.append(OBS_DATA.obsary[k].obsfrefList[0].P)
-
+            #OBS_P.append(OBS_DATA.obsary[k].obsfrefList[0].P)
+        #sppparm = SPPParm()
         sol.init(OBS_DATA.gpsweek, OBS_DATA.t_obs)
-        sol = self.estpos(nav_list, OBS_P, sol)
+        #rtkParam.updateSol(sol)
+        sppparm = self.estpos(nav_list, OBS_DATA, sol)
+        for i in range(tool.MAXSAT):
+            rtkParam.ssatList[i].vs = 0
+            rtkParam.ssatList[i].azel = [0.0,0.0]
+            rtkParam.ssatList[i].resp = [0.0,0.0,0.0]
+            rtkParam.ssatList[i].resc = [0.0,0.0,0.0]
+            rtkParam.ssatList[i].snr = [0,0,0]
+        for i in range(len(OBS_DATA.obsary)):
+            rtkParam.ssatList[OBS_DATA.obsary[i].prn-1].azel = sppparm.azel[i]
+            rtkParam.ssatList[OBS_DATA.obsary[i].prn - 1].snr[0] =OBS_DATA.obsary[i].obsfrefList[0].S
+            if sppparm.vsat[i] != 1 :
+                continue
+            rtkParam.ssatList[OBS_DATA.obsary[i].prn - 1].vs = 1
+            rtkParam.ssatList[OBS_DATA.obsary[i].prn - 1].resp[0] = sppparm.resp[i]
         # print("week=",sol.gpsweek,"  time = ", sol.gpssec, "  X = ", sol.X," ns = ",sol.ns,"  age = ",sol.age)
-
-        return sol
+        rtkParam.updateSol(sppparm.sol)
+        return rtkParam

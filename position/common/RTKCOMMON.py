@@ -1,5 +1,28 @@
 from position.common import tool
 import numpy as np
+
+class SSAT():
+    def __init__(self):
+        self.sys = 0 #gps:0,glo:1,bds:2,GAL:3
+        self.vs = 0
+        self.azel = [0.0,0.0]
+        self.resp = [0.0,0.0,0.0]
+        self.resc = [0.0,0.0,0.0]
+        self.vsat = [0.0,0.0,0.0]
+        self.snr = [0.0, 0.0, 0.0]
+        self.fix = [0.0, 0.0, 0.0]
+        self.slip = [0,0,0]
+        self.lock = [0.0, 0.0, 0.0]
+        self.outc = [0.0, 0.0, 0.0]
+        self.slipc = [0.0,0.0,0.0]
+        self.rejc = [0.0,0.0,0.0]
+        self.gf = 0
+        self.gf2 = 0
+        self.phw = 0
+        self.pt = [[0,0.0],[0,0.0]]
+        self.ph = [[0.0,0.0,0.0],[0.0,0.0,0.0]]
+
+
 #将接收机位置从ecef转成BLH格式）
 #
 def eceftopos(rr, blhpos):

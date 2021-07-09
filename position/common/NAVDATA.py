@@ -29,6 +29,7 @@ class Nav():
     FLAG = 0
     SAV = 0
     SVH = 0
+    TGD = 0
 
     x = 0
     y = 0
@@ -51,7 +52,7 @@ class Nav():
     def ura_index(self,sva):
         ura_eph = [2.4,3.4,4.85,6.85,9.65,13.65,24.0,48.0,96.0,192.0,384.0,768.0,1536.0,3072.0,6144.0]
         for i in range(15):
-            if ura_eph[i] >= sva:
+            if ura_eph[i] >= int(sva):
                 break
         return ura_eph[i]
 
@@ -85,6 +86,7 @@ class Nav():
         self.FLAG = navarray[24]
         self.SAV = self.ura_index(navarray[25])
         self.SVH = navarray[26]
+        self.TGD = navarray[27]
 
 class NavData():
 

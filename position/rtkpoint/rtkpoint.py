@@ -4,8 +4,8 @@ from position.rtkpoint import *
 import time
 
 if __name__ == '__main__':
-    baseObs = OBSDATA.ObsData().initObsData("D:\program\python\SPPositionWithGPSandGLO\data\\base.21O")
-    roverObs = OBSDATA.ObsData().initObsData("D:\program\python\SPPositionWithGPSandGLO\data\\rover.21O")
+    baseObs = OBSDATA.ObsData().initObsData2("D:\program\python\SPPositionWithGPSandGLO\data\\base.21O",2)
+    roverObs = OBSDATA.ObsData().initObsData2("D:\program\python\SPPositionWithGPSandGLO\data\\rover.21O",1)
     navDataList = NAVDATA.NavData().initNavData("D:\program\python\SPPositionWithGPSandGLO\data\\nav.21N")
     nRover = len(roverObs)
     nBase = len(baseObs)
