@@ -134,7 +134,7 @@ def satAzel(blhpos, e):
 def r_corr(nav, rr):
 
     r = np.sqrt(tool.dot([nav.x - rr[0], nav.y - rr[1], nav.z - rr[2]]))
-    #print("r_corr : " ,r)
+    print("r_corr : " ,r)
     # 再加上
     r += tool.OMGE * (nav.x * rr[1] - nav.y * rr[0]) / tool.CLIGHT
     return r

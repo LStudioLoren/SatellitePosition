@@ -134,8 +134,8 @@ class SinglePointPosition():
             n = 4
             k = 4
             m = spparm.vn
-            print(spparm.e_matrix)
-            print(spparm.V)
+            print("H = ",spparm.e_matrix)
+            print("V = ",spparm.V)
             dx = tool.LSP(n, k, m, spparm.e_matrix, spparm.V, dx)
             for i in range(4):
                 X[i] += dx[i]
@@ -164,6 +164,7 @@ class SinglePointPosition():
             respList.append(0)
             # 伪距修正，根据卫星位置，减去估算的用户位置
             r = RTKCOMMON.r_corr(nav_list[i], rr)  # [nav_list[i].nav.x,nav_list[i].nav.y,nav_list[i].nav.z]
+            print("before r",r,"  rr = ",rr," RS = ",nav_list[i].x,nav_list[i].y,nav_list[i].z)
             # 计算接收机相对于卫星位置的向量数组
             e = RTKCOMMON.e_corr(nav_list[i], rr)
             # 计算卫星的方位角和截止角
@@ -183,7 +184,7 @@ class SinglePointPosition():
             tropCorr = self.tropcorr(t_obs,pos,azelList[i],1)
             pCorr = self.prange(OBS_DATA,nav_list,azelList[i],i)
             #dtrp = 0
-            print("P =",pCorr[0], "  r=  ",r,"  ")
+            print("P =",pCorr[0], "  r=  ",r,"  "," dtr = ",dtr," nav_list[i].dts= ",nav_list[i].dts," ionCorr[0]= ",ionCorr[0]," tropCorr[0]= ",tropCorr[0])
             V[vn] = pCorr[0] - (r + dtr - tool.CLIGHT * nav_list[i].dts + ionCorr[0] + tropCorr[0])
             # 将e数组变乘以-1，主要是用于后续最小二乘法中去。并合并到大数组中，得到LSP需要的矩阵H
             for j in range(3):

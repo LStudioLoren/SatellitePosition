@@ -1,5 +1,7 @@
 from position.common import *
 import numpy as np
+
+print(6&3)
 err = [100,0.003,0.003]
 print(np.square(err[0])*(np.square(err[1]) + np.square(err[2])/np.sin(1.5707963267948966*180/np.pi))+5.76+0.09)
 #varr=SQR(opt->err[0])*(SQR(opt->err[1])+SQR(opt->err[2])/sin(el));

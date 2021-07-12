@@ -16,6 +16,12 @@ EARTH_RAD = 7.2921151467E-5   #地球自转常数EARTH_RAD
 FREQ1 = 1.57542E9
 #L2的频率
 FREQ2 = 1.22760E9
+
+
+#NFREQ,最大载波频点
+NFREQ = 3
+#光速除以L1/L2的频率
+lam = [CLIGHT / FREQ1,CLIGHT / FREQ2]
 def dot_n(rr,n):
     r = 0
     for i in range(n):

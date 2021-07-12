@@ -129,7 +129,7 @@ class ObsData():
 
                     of = self.readObsFref(j+1, float(line[4+j*64:17+j*64]),#4:17、68:81
                                               float(line[19+j*64:33+j*64]),#18:35
-                                              int(line[34+j*64:35+j*64]),
+                                              (0 if line[33+j*64:34+j*64] == ' ' else int(line[33+j*64:34+j*64])),
                                               float(line[37+j*64:49+j*64]),#36:49
                                               float(line[50+j*64:67+j*64]),0)#50:67
                     of_list.append(of)

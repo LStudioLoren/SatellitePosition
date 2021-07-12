@@ -45,6 +45,9 @@ class RTKPARAM():
 
 
 class RTKPoistion():
+    def __init__(self):
+        self.opt = OPTION.POSTIONOPTION()
+
     def exeRTKPositon(self,rtkParam,roverObs,baseObs,navDataList):
         #先计算单点位置，获取首次有效定位、速度
         rtkParam = SINGLEPOINTPOSITION.SinglePointPosition().exesinglepoint(roverObs, navDataList, rtkParam)
@@ -245,10 +248,34 @@ class RTKPoistion():
             a = (var if i==j else 0)
             rtkParam.P[j][i] = a
             rtkParam.P[i][j] = a
+    def sdobs(self,obs,ir,ib,f):
+        pi = obs.obsary[ir].obsfrefList[f].L if f < tool.NFREQ else obs.obsary[ir].obsfrefList[f-tool.NFREQ].P
+        pj = obs.obsary[ib].obsfrefList[f].L if f < tool.NFREQ else obs.obsary[ib].obsfrefList[f-tool.NFREQ].P
+        return 0 if pi == 0 or pj == 0 else pi-pj
+
+    def gfobs(self,obs,ir,ib):
+
+        pi = self.sdobs(obs,ir,ib,0)*tool.lam[0]
+        pj = self.sdobs(obs,ir,ib,1)*tool.lam[1]
+        return 0 if pi ==0 or pj==0 else pi-pj
+    def detslp_gf(self,rtkParam,obs,ir,ib,nav):
+        sat = obs.obsary[ir].prn
+        g1 = self.gfobs(obs,ir,ib)
+        if self.opt.nf <= 1 or g1 == 0:
+            return 0
+        g0 = rtkParam.ssatList[sat-1].gf
+        rtkParam.ssatList[sat-1].gf = g1
+        if g0 != 0 and np.fabs(g1-g0) > self.opt.thresslip :
+            rtkParam.ssatList[sat-1].slip[0] |= 1
+            rtkParam.ssatList[sat-1].slip[1] |= 1
+
+        return rtkParam
     #detect cycle slip by LLI
     def detslp_ll(self,rtkParam,obs,i,rcv):
         sat = obs.obsary[i].prn
-        for f in range(2):
+        for f in range(self.opt.nf):
+            if obs.obsary[i].obsfrefList[f].L == 0 :
+                continue
             LLI1 = (rtkParam.ssatList[sat-1].slip[f] >> 6) & 3
             LLI2 = (rtkParam.ssatList[sat-1].slip[f] >> 4) & 3
             LLI = LLI1 if rcv == 1 else LLI2
@@ -263,18 +290,20 @@ class RTKPoistion():
             if(rcv == 1):
                 rtkParam.ssatList[sat-1].slip[f] = (obs.obsary[i].obsfrefList[f].LLI << 6)|(LLI2<<4)|slip
             else:
-                rtkParam.ssatList[sat - 1].slip[f] = (obs.obsary[i].obsfrefList[f].LLI << 4) | (LLI2 << 6) | slip
+                rtkParam.ssatList[sat - 1].slip[f] = (obs.obsary[i].obsfrefList[f].LLI << 4) | (LLI1 << 6) | slip
 
         return rtkParam
 
     def upbias(self,rtkParam,tt,satList,irover,ibase,ns,nav,obs):
-        nf = 2
+        #nf = 2
         for i in range(ns):
-            for j in range(2):
+            for j in range(self.opt.nf):
                 rtkParam.ssatList[satList[i]-1].slip[j] &= 0xFC
             self.detslp_ll(rtkParam,obs,irover[i],1)
             self.detslp_ll(rtkParam,obs,ibase[i],2)
-            print()
+
+            self.detslp_gf(rtkParam,obs,irover[i],ibase[i],nav)
+
         print()
 
     def updos(self,rtkParam,tt):

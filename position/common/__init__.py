@@ -4,5 +4,6 @@ __all__=[
     'SATPOS',
     'tool',
     'solustion',
-    'RTKCOMMON'
+    'RTKCOMMON',
+    'OPTION'
 ]
