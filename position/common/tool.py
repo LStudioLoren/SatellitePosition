@@ -2,7 +2,8 @@ import numpy as np
 import math as m
 from scipy import linalg
 #工具集
-
+MAXSAT = 116
+MAXFREF =243
 CLIGHT =299792458.0  #光速
 OMGE=7.2921151467E-5  #
 FE_WGS84 = 1 / 298.257223563 # 地球扁率 1/长半轴-短半轴
@@ -15,10 +16,80 @@ EARTH_RAD = 7.2921151467E-5   #地球自转常数EARTH_RAD
 FREQ1 = 1.57542E9
 #L2的频率
 FREQ2 = 1.22760E9
+def dot_n(rr,n):
+    r = 0
+    for i in range(n):
+        r+= rr[i]*rr[i]
+    return r
+def norm(rr,n):
+    return np.sqrt(dot_n(rr,n))
+
+
 def dot(rr):
     return rr[0]*rr[0]+rr[1]*rr[1]+rr[2]*rr[2]
 def dot2(rr):
     return rr[0]*rr[0]+rr[1]*rr[1]
+
+def zeroMat(n,m):
+    A =[]
+    for i in range(n):
+        B = []
+        for j in range(m):
+            B.append(0)
+        A.append(B)
+    return A
+
+def eyeMat(n):
+    A = zeroMat(n,n)
+    for i in range(n):
+        A[i][i] = 1
+    return A
+
+#n列*m行  *  k列*m行
+def mulmatirix(n,k,m,A,B,type):
+    C = []
+    if type == "NN":
+        #n == m
+        for i in range(n):
+            dlist = []
+            for j in range(k):
+                d = 0
+                for x in range(m):
+                    d+=A[i][x]*B[x][j]
+                dlist.append(d)
+            C.append(dlist)
+    #NT,k ==n
+    elif type == "NT":
+        for i in range(n):
+            dlist = []
+            for j in range(k):
+                d = 0
+                for x in range(m):
+                    d+=A[i][x]*B[j][x]
+                dlist.append(d)
+            C.append(dlist)
+    elif type =="TN":
+        for i in range(n):
+            dlist = []
+            for j in range(k):
+                d = 0
+                for x in range(m):
+                    d+=A[x][i]*B[x][j]
+                dlist.append(d)
+            C.append(dlist)
+    elif type == "TT":
+        for i in range(n):
+            dlist = []
+            for j in range(k):
+                d = 0
+                for x in range(m):
+                    d+=A[x][i]*B[j][x]
+                dlist.append(d)
+            C.append(dlist)
+    return C
+
+
+
 
 #这里的得出来的是A的倒转*B矩阵，
 def mulmatirix_signle(n,k,m,A,B):
@@ -59,17 +130,25 @@ X = (e*e_t)^-1(P-r)*e_t
 '''
 
 def LSP(n,k,m,A,y,C):
+    #dx = (A^T*A)^-1  *  (A^T *y)
     #A*dx=y[p-r]  -》A*dx-y = 0
     #根据矩阵
-    #Ay = A*y
-    Ay = mulmatirix_signle(n,1,m,A,y)
-    #Q = A*A'
-    Q = mulmatirix_multi(n,k,m,A,A)
+    #Ay = A^T*y,A^T的倒转*y
+    Ay = mulmatirix(n,1,m,A,y,"TN")
+    #Q = A^t*A
+    #Q = mulmatirix_multi(n,k,m,A,A)
+    Q = mulmatirix(n,k,m,A,A,"TN")
     #Q_1 = Q inv,Q-1
-    #这个是将A*A的倒转求逆
+    #这个是将A^T*A求逆
     Q_1 = np.linalg.inv(Q)
-    C = mulmatirix_signle(n,1,n,Q_1,Ay)
-    return C
+    #这里是求Q^-1 * Ay
+    C = mulmatirix(n,1,n,Q_1,Ay,"NN")
+    #C数组是 一个 n列*1行的二维数组，因此此次将其重新编辑为一维数组
+    C2 = []
+    for i in range(len(C)):
+        C2.append(C[i][0])
+    #print("C",C2)
+    return C2
 
 def dayofyear(ep):
     dayofyear = 0
@@ -108,7 +187,7 @@ def GPST2EPOCH(gpsweek,gpssec):
     ep[3] = int(sec / 3600)
     ep[4] = int(np.mod(sec,3600)/60)
     ep[5] = np.mod(sec,60)
-    print(ep)
+    #print(ep)
     return ep
 #将年月日时分秒，转为GPS周+周秒，且GPS从1980年1月6日开始计算。
 #当leapsec为0时，表示将rinex中的gps年月日时分秒转为周秒格式

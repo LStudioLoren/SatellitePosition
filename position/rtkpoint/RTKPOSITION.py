@@ -2,23 +2,52 @@ from position.singlepoint import SINGLEPOINTPOSITION
 from position.common import *
 import numpy as np
 class RTKPARAM():
-    #基站坐标，ECEF-XYZ
-    refPoint = []
-    #rtk状态
-    rtkStatus = 0
-    #解状态
-    sol = solustion.positionsol()
+    def __init__(self):
+        # 基站坐标，ECEF-XYZ
+        self.refPoint = [0.0,0.0,0.0,0.0,0.0,0.0]
+        # rtk状态
+        self.rtkStatus = 0
+        # 解状态
+        self.sol = solustion.positionsol()
+
+        self.nx = tool.MAXFREF
+        self.na = 9
+        self.tt = 0.0
+        self.x = []
+        self.P = []
+        self.xa = []
+        self.Pa = []
+        self.nfix = 0
+        self.neb = 0
+        self.ssatList = []
+        for i in range(tool.MAXSAT):
+            ssat = RTKCOMMON.SSAT()
+            self.ssatList.append(ssat)
+
+        for i in range(self.nx):
+            self.x.append([0])
+            self.xa.append([0])
+            plist = []
+            palist = []
+            for j in range(self.nx):
+                plist.append(0)
+                palist.append(0)
+            self.P.append(plist)
+            self.Pa.append(palist)
+
 
     def initRefPoint(self,X,Y,Z):
         self.refPoint = (X,Y,Z)
     def updateSol(self,sol):
         self.sol = sol
+    def getrr(self):
+        return [self.x[0][0],self.x[1][0],self.x[2][0]]
 
 
 class RTKPoistion():
     def exeRTKPositon(self,rtkParam,roverObs,baseObs,navDataList):
         #先计算单点位置，获取首次有效定位、速度
-        rtkParam.sol = SINGLEPOINTPOSITION.SinglePointPosition().exesinglepoint(roverObs, navDataList, rtkParam.sol)
+        rtkParam = SINGLEPOINTPOSITION.SinglePointPosition().exesinglepoint(roverObs, navDataList, rtkParam)
 
         #baseNavList = []
         #roverNavList = []
@@ -28,20 +57,28 @@ class RTKPoistion():
         if len(roverObs.obsary) < 4:
             rtkParam.update(rtkParam.sol.X, len(roverObs.obsary), 0, 0)
             return rtkParam.sol
+        rtkParam.sol.rr = [-2333326.6741502904, 5383652.2228962239, 2492168.6526665115,0.0,0.0,0.0]
 
         #根据基站位置计算基于基站的卫星位置信息等
         baseNavList = self.getNavList(baseObs,navDataList)
+        roverNavList = self.getNavList(roverObs,navDataList)
+
         nbaseObs = len(baseObs.obsary)
         nroverObs = len(roverObs.obsary)
 
-        #roverNavList = self.getNavList(roverObs,navDataList)
+        allObs = roverObs
+        for i in range(nbaseObs):
+            allObs.obsary.append(baseObs.obsary[i])
+
+        allNavList = self.getNavList(allObs,navDataList)
 
         #进行基站的非差残差计算
-        if self.zdres(0,baseObs,len(baseObs.obsary),baseNavList,rtkParam.refPoint,1) != 1:
+        if self.zdres(0,baseObs,nbaseObs,baseNavList,rtkParam.refPoint,1) != 1:
             return rtkParam.sol
-        #获取移动站和基站的公共卫星号、对应各自obs数组的位置。
-        self.selectCommonSat(roverObs,baseObs,nroverObs,nbaseObs)
+        #获取移动站和基站的公共卫星号、对应在allObs数组的位置。
+        satComList = self.selectCommonSat(allObs,nroverObs,nbaseObs)
 
+        self.updateState(rtkParam,satComList[0],satComList[1],satComList[2],len(satComList[0]),allNavList,allObs)
 
 
 
@@ -53,7 +90,7 @@ class RTKPoistion():
                 if obs.obsary[k].prn == navDataList[i].prn:
                     # 卫星观测量对应的L1伪距
                     # 整理星历数据打包程nav对象，计算卫星位置pos，计算卫星种差dts，计算卫星位置及时钟方差vare
-                    print("卫星:",navDataList[i].prn,"位置：")
+                    #print("卫星:",navDataList[i].prn,"位置：")
                     navList.append(SATPOS.SatPos().getSatpos(navDataList[i], obs.t_obs,
                                                                  obs.obsary[k].obsfrefList[0].P))
                 else:
@@ -71,7 +108,7 @@ class RTKPoistion():
             for j in range(nfre*2):
                 y_obs.append(0)
             y.append(y_obs)
-        print(y[0],y[0][1])
+        #print(y[0],y[0][1])
         if tool.dot(rr) <=0 :
             return 0
         rr_ = rr
@@ -91,11 +128,11 @@ class RTKPoistion():
                 continue
 
             r += (-tool.CLIGHT)* navList[i].dts
-            print(r)
+            #print(r)
             zhd = self.tropmodel(obs.t_obs,pos,[0,90*np.pi/180],0)
             tropnmf = self.tropmapf_nmf(obs.gpsweek,obs.t_obs,pos,azel,0)
             r += tropnmf*zhd
-            print(r,tropnmf,zhd)
+            #print(r,tropnmf,zhd)
             for j in range(len(obs.obsary[i].obsfrefList)):
                 #for k in range():
                 if (obs.obsary[i].obsfrefList[j].L > 0.0) :
@@ -171,18 +208,150 @@ class RTKPoistion():
         sinel = np.sin(el)
         return (1+a/(1+b/(1+c)))/(sinel+(a/(sinel+b/(sinel+c))))
 
-    def selectCommonSat(self,roverObs,baseObs,nroverObs,nbaseObs):
+    def selectCommonSat(self,allObs,nroverObs,nbaseObs):
         satList=[]
         irover = []
         ibase = []
-        for i in range(nroverObs):
-            for j in range(nbaseObs):
-                if roverObs.obsary[i].prn == baseObs.obsary[j].prn:
-                    satList.append(roverObs.obsary[i].prn)
-                    irover.append(i)
-                    ibase.append(j)
+        i = 0
+        j = nroverObs
+        while i < nroverObs and j < nroverObs + nbaseObs:
 
-        print(satList,irover,ibase)
+            if allObs.obsary[i].prn < allObs.obsary[j].prn :
+                j -=1
+            elif allObs.obsary[i].prn > allObs.obsary[j].prn:
+                i-=1
+            elif allObs.obsary[i].prn == allObs.obsary[j].prn:
+                satList.append(allObs.obsary[i].prn)
+                irover.append(i)
+                ibase.append(j)
+            i += 1
+            j += 1
+
+        # for i in range(0,nroverObs):
+        #     for j in range(nroverObs,nbaseObs):
+        #         if allObs.obsary[i].prn == allObs.obsary[j].prn:
+
+        return [satList,irover,ibase]
+    #self.updateState(rtkParam,satComList[0],satComList[1],satComList[2],len(satComList[0]),allNavList,allObs)
+    def updateState(self,rtkParam,satList,irover,ibase,ns,nav,obs):
+        tt = np.fabs(rtkParam.tt);
+        self.updos(rtkParam,tt)
+        self.upbias(rtkParam,tt,satList,irover,ibase,ns,nav,obs)
+        print()
+
+    def initX(self,rtkParam,xi,var,i):
+        rtkParam.x[i][0] = xi
+        for j in range(rtkParam.nx):
+            a = (var if i==j else 0)
+            rtkParam.P[j][i] = a
+            rtkParam.P[i][j] = a
+    #detect cycle slip by LLI
+    def detslp_ll(self,rtkParam,obs,i,rcv):
+        sat = obs.obsary[i].prn
+        for f in range(2):
+            LLI1 = (rtkParam.ssatList[sat-1].slip[f] >> 6) & 3
+            LLI2 = (rtkParam.ssatList[sat-1].slip[f] >> 4) & 3
+            LLI = LLI1 if rcv == 1 else LLI2
+
+            slip = (rtkParam.ssatList[sat-1].slip[f]|obs.obsary[i].obsfrefList[f].LLI)&3
+            if obs.obsary[i].obsfrefList[f].LLI & 1 :
+                print("error")
+
+            if (((LLI&2) and (not (obs.obsary[i].obsfrefList[f].LLI & 2))) or ((not(LLI & 2)) and ((obs.obsary[i].obsfrefList[f].LLI)&2))):
+                slip |= 1
+
+            if(rcv == 1):
+                rtkParam.ssatList[sat-1].slip[f] = (obs.obsary[i].obsfrefList[f].LLI << 6)|(LLI2<<4)|slip
+            else:
+                rtkParam.ssatList[sat - 1].slip[f] = (obs.obsary[i].obsfrefList[f].LLI << 4) | (LLI2 << 6) | slip
+
+        return rtkParam
+
+    def upbias(self,rtkParam,tt,satList,irover,ibase,ns,nav,obs):
+        nf = 2
+        for i in range(ns):
+            for j in range(2):
+                rtkParam.ssatList[satList[i]-1].slip[j] &= 0xFC
+            self.detslp_ll(rtkParam,obs,irover[i],1)
+            self.detslp_ll(rtkParam,obs,ibase[i],2)
+            print()
+        print()
+
+    def updos(self,rtkParam,tt):
+        Q = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
+        pos = [0.0,0.0,0.0]
+        prn = [ 1E-4,1E-3,1E-4,1E-1,1E-2 ,0.0]
+        if(tool.dot(rtkParam.getrr()) <= 0.0):
+            for i in range(3):
+                self.initX(rtkParam,rtkParam.sol.rr[i],30*30,i)
+
+            for i in range(3,6):
+                self.initX(rtkParam,rtkParam.sol.rr[i],10*10,i)
+
+            for i in range(6,9):
+                self.initX(rtkParam,1E-6,10*10,i)
+        variance = 0
+        for i in range(3):
+            variance += rtkParam.P[i][i]
+        variance /= 3
+
+        if variance > 30*30 :
+            print()
+
+        F = tool.eyeMat(rtkParam.nx)
+        for i in range(6):
+            F[i+3][i] = tt
+        #FP = tool.zeroMat(rtkParam.nx,rtkParam.nx)
+        #xp = tool.zeroMat(rtkParam.nx,1)
+
+        for i in range(6):
+            F[i][i+3] = tt
+        #print(rtkParam.x)
+        xp = tool.mulmatirix(rtkParam.nx,1,rtkParam.nx,F,rtkParam.x,"TN")
+        FP = tool.mulmatirix(rtkParam.nx,rtkParam.nx,rtkParam.nx,F,rtkParam.P,"TN")
+        rtkParam.P = tool.mulmatirix(rtkParam.nx,rtkParam.nx,rtkParam.nx,FP,F,"TT")
+        rtkParam.x = xp
+        Q[0] = Q[4] = prn[3]*prn[3]
+        Q[8] = prn[4]*prn[4]
+        Qv=[]
+        pos = RTKCOMMON.eceftopos(rtkParam.getrr(),pos)
+        #print(pos)
+        #pos = [0.40407093076627232, 1.9797683819037855, 20.058078320696950]
+        Qv = self.convEcef(pos,Q)
+        for i in range(3):
+            for j in range(3):
+                rtkParam.P[i+6][j+6] += Qv[i+j*3]
+        print(rtkParam.x)
+
+    def convEcef(self,pos,Q):
+        Qv = []
+        E = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        EQ= []
+        E = RTKCOMMON.xyz2enu(pos,E)
+        #E^T *Q,
+        for i in range(3):
+            #dl = []
+            for j in range(3):
+                d = 0
+                for k in range(3):
+                    d += E[k+i*3]*Q[k+j*3]
+                    #print("E[",k+i*3,"]*Q[",k+j*3,"]")
+                EQ.append(d)
+        #EQ^T *E
+        for i in range(3):
+            for j in range(3):
+                d = 0
+                for k in range(3):
+                    d += EQ[k+i*3]*E[k+j*3]
+                Qv.append(d)
+        return Qv
+            #EQ.append()
+
+
+
+
+
+
 
 
 

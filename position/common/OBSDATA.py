@@ -7,19 +7,25 @@ class Obsfref():
     SIGNEL_TYPE = 0
     #C/A码
     P = 0
+    #LLI
+    LLI = 0
     #载波
     L = 0
     #Doppler
     D = 0
     #信号强度
     S = 0
+    # CODE
+    CODE = 0
 
-    def init(self, SINGEL_TYPE,P, L, D, S):
+    def init(self, SINGEL_TYPE,P, L,LLI,D, S,CODE):
         self.SIGNEL_TYPE = SINGEL_TYPE
         self.P = P
+        self.LLI = LLI & 3
         self.L = L
         self.D = D
-        self.S = S
+        self.S = int(S*4+0.5)
+        self.CODE = CODE
 
 
 # 单个OBS数据
@@ -32,7 +38,7 @@ class Obss():
     #p1 = 0
     # L2伪距
     #p2 = 0
-
+    revflag =0
     nFref = 0
     obsfrefList = []
 
@@ -41,10 +47,11 @@ class Obss():
         self.p1 = p1
         self.p2 = p2
 
-    def init_obss2(self, prn, obsfrefList):
+    def init_obss2(self, prn, obsfrefList,revflag):
         self.prn = prn
         self.obsfrefList = obsfrefList
         self.nFref = len(obsfrefList)
+        self.revflag = revflag
 
 
 # 同一时刻的OBS数据集
@@ -64,6 +71,8 @@ class Obs():
 # 初始化OBS数据，最后打包成OBS数据集
 class ObsData():
     def initObsData(self, filepath):
+        return self.initObsData2(filepath,1)
+    def initObsData2(self, filepath,flag):
         fo = open(filepath, mode='r', newline='\n')
         while True:
             # fo.read()
@@ -97,7 +106,7 @@ class ObsData():
 
                 gpst = tool.UTC2GPST(int(line[2:6]), int(line[7:9]), int(line[10:12]), int(line[13:15]), int(line[16:18]), float(line[19:29]), 0)
             else:
-
+                type = 0
                 line_len = len(line)
                 # print(line_len)
                 if line[:3].find("G") == -1:
@@ -106,6 +115,7 @@ class ObsData():
                     continue
                 elif line_len < 66:
                     n =1
+                    type = 1
                 elif line_len < 330:
                     n=2
 
@@ -113,12 +123,19 @@ class ObsData():
                 for j in range(n):
                     #for j in range([14,18,14,18]):
                     #print(line[4+j*64:17+j*64],line[19+j*64:33+j*64],line[37+j*64:49+j*64],line[50+j*64:67+j*64])
+                    #G17  21634967.664 8 113692520.379 8       636.504          50.000    21634970.820 8  88591581.902 8       495.977          50.000    21634971.516 8  88591585.906 8       495.977          49.000
+                    #01234567890123456789012345678901234567890123456789
+                    #    012345678901234
+
                     of = self.readObsFref(j+1, float(line[4+j*64:17+j*64]),#4:17、68:81
                                               float(line[19+j*64:33+j*64]),#18:35
+                                              int(line[34+j*64:35+j*64]),
                                               float(line[37+j*64:49+j*64]),#36:49
-                                              float(line[50+j*64:67+j*64]))#50:67
+                                              float(line[50+j*64:67+j*64]),0)#50:67
                     of_list.append(of)
-                obss.init_obss2(int(line[:3].replace("G", "")),of_list)
+                if type == 1 :
+                    of_list.append(self.readObsFref(2,0,0,0,0,0,0))
+                obss.init_obss2(int(line[:3].replace("G", "")),of_list,flag)
                 # elif line_len <200:
                 #     continue
                 # elif line_len <260:
@@ -149,8 +166,8 @@ class ObsData():
             #print(obsary[minidex].prn)
         return obsary
 
-    def readObsFref(self,fref_type,P,L,D,S):
+    def readObsFref(self,fref_type,P,L,LLI,D,S,CODE):
         #print(P,L,D,S)
         of = Obsfref()
-        of.init(fref_type,P,L,D,S)
+        of.init(fref_type,P,L,LLI,D,S,CODE)
         return of
