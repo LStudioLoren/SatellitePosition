@@ -1,6 +1,10 @@
 from position.common import *
 import numpy as np
 
+a = 1
+b = 0x4
+c = a>5
+print(a == b)
 print(6&3)
 err = [100,0.003,0.003]
 print(np.square(err[0])*(np.square(err[1]) + np.square(err[2])/np.sin(1.5707963267948966*180/np.pi))+5.76+0.09)

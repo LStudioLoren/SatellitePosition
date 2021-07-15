@@ -24,16 +24,11 @@ class RTKPARAM():
             ssat = RTKCOMMON.SSAT()
             self.ssatList.append(ssat)
 
-        for i in range(self.nx):
-            self.x.append([0])
-            self.xa.append([0])
-            plist = []
-            palist = []
-            for j in range(self.nx):
-                plist.append(0)
-                palist.append(0)
-            self.P.append(plist)
-            self.Pa.append(palist)
+        self.x = tool.zeroMat(self.nx,1)
+        self.xa = tool.zeroMat(self.nx, 1)
+        self.P = tool.zeroMat(self.nx, self.nx)
+        self.Pa = tool.zeroMat(self.nx, self.nx)
+
 
 
     def initRefPoint(self,X,Y,Z):
@@ -42,9 +37,55 @@ class RTKPARAM():
         self.sol = sol
     def getrr(self):
         return [self.x[0][0],self.x[1][0],self.x[2][0]]
+class zdresParam():
+    def __init__(self):
+        self.y = []
+        self.azel = []
+        self.e = []
+        self.xp = []
+        self.state = 0
+        self.vflg = []
+        self.Pp = []
+        self.xa = []
+        self.v = []
+        self.H = []
+        self.R = []
+        self.nv = 0
+        self.bias=[]
+    def init(self,nf,n):
+        self.y = tool.zeroMat(n,nf*2)
+        self.azel = tool.zeroMat(n,2)
+        self.e = tool.zeroMat(n,3)
+        self.vflg = tool.zeroMat(64*2*2+1,1)
+        return self
+    def init2(self,ny,nx):
+        self.Pp = tool.zeroMat(nx,nx)
+        self.xa = tool.zeroMat(nx,1)
+        self.v = tool.zeroMat(ny,1)
+        self.H = tool.zeroMat(nx,ny)
+        self.R = tool.zeroMat(ny,ny)
+        self.bias = tool.zeroMat(nx,1)
+        return self
 
 
 class RTKPoistion():
+    def NP(self,opt):
+        return 3 if opt.dynamics == 0 else 9
+
+    def NI(self,opt):
+        return 0 if opt.ionomodel != 4 else tool.MAXSAT
+
+    def NT(self,opt):
+        return 0 if opt.tropmodel < 3 else 6
+
+    def NL(self,opt):
+        return 0 if opt.glomodear != 2 else 2
+    def NR(self,opt):
+        return self.NP(opt)+self.NI(opt)+self.NT(opt)+self.NL(opt)
+
+    def IB(self,s,f,opt):
+        return self.NR(opt)+tool.MAXSAT*f+s-1
+
     def __init__(self):
         self.opt = OPTION.POSTIONOPTION()
 
@@ -60,7 +101,7 @@ class RTKPoistion():
         if len(roverObs.obsary) < 4:
             rtkParam.update(rtkParam.sol.X, len(roverObs.obsary), 0, 0)
             return rtkParam.sol
-        rtkParam.sol.rr = [-2333326.6741502904, 5383652.2228962239, 2492168.6526665115,0.0,0.0,0.0]
+        #rtkParam.sol.rr = [-2333326.6741502904, 5383652.2228962239, 2492168.6526665115,0.0,0.0,0.0]
 
         #根据基站位置计算基于基站的卫星位置信息等
         baseNavList = self.getNavList(baseObs,navDataList)
@@ -75,14 +116,32 @@ class RTKPoistion():
 
         allNavList = self.getNavList(allObs,navDataList)
 
+        zParam = zdresParam().init(self.opt.nf,nroverObs+nbaseObs)
         #进行基站的非差残差计算
-        if self.zdres(0,baseObs,nbaseObs,baseNavList,rtkParam.refPoint,1) != 1:
+        zParam = self.zdres(0,baseObs,nbaseObs,nbaseObs,nroverObs,baseNavList,rtkParam.refPoint,1,zParam)
+        if  zParam.state != 1:
             return rtkParam.sol
         #获取移动站和基站的公共卫星号、对应在allObs数组的位置。
         satComList = self.selectCommonSat(allObs,nroverObs,nbaseObs)
 
-        self.updateState(rtkParam,satComList[0],satComList[1],satComList[2],len(satComList[0]),allNavList,allObs)
+        rtkParam = self.updateState(rtkParam,satComList[0],satComList[1],satComList[2],len(satComList[0]),allNavList,allObs)
+        niter = self.opt.iter
 
+        xp = rtkParam.x
+        zParam.xp = xp
+        ny = len(satComList[0]) * self.opt.nf * 2 + 2
+        zParam = zParam.init2(ny, rtkParam.nx)
+        for i in range(niter):
+            zParam = self.zdres(1,roverObs,nroverObs,nbaseObs,nroverObs,roverNavList,[rtkParam.x[0][0],rtkParam.x[1][0],rtkParam.x[2][0]],1,zParam)
+            if zParam.state != 1:
+                break
+            zParam = self.ddres(rtkParam,allNavList,0,satComList[0],satComList[1],satComList[2],len(satComList[0]),zParam)
+            if zParam.state != 1:
+                break
+
+
+
+        print()
 
 
     def getNavList(self,obs,navDataList):
@@ -99,27 +158,34 @@ class RTKPoistion():
                 else:
                     continue
         return navList
-    def zdres(self,type,obs,nobs,navList,rr,index):
+
+    #type ==0是基站
+    def zdres(self,type,obs,nobs,nbaseobs,nrover,navList,rr,index,zParam):
+        basei = 0
+        if type == 0:
+            basei = nrover
 
         #for i in range(len(obs))
-        nfre = 2
-        y=[]
+        nfre = self.opt.nf
+        y = zParam.y
         dant=[]
-        for i in range(nobs):
-            y_obs = []
-            dant.append(0)
-            for j in range(nfre*2):
-                y_obs.append(0)
-            y.append(y_obs)
+        # for i in range(nobs):
+        #     y_obs = []
+        #     dant.append(0)
+        #     for j in range(nfre*2):
+        #         y_obs.append(0)
+        #     y.append(y_obs)
         #print(y[0],y[0][1])
         if tool.dot(rr) <=0 :
-            return 0
+            zParam.state =0
+            return zParam
         rr_ = rr
         pos = [0.0,0.0,0.0]
         pos = RTKCOMMON.eceftopos(rr_,pos)
         #L1+L2双频计算
         lam = [tool.CLIGHT / tool.FREQ1, tool.CLIGHT / tool.FREQ2]
         for i in range(nobs):
+            dant.append(0)
             r = RTKCOMMON.r_corr(navList[i],rr_)
             #print(r)
             if r <= 0 :
@@ -127,6 +193,8 @@ class RTKPoistion():
 
             e = RTKCOMMON.e_corr(navList[i],rr_)
             azel = RTKCOMMON.satAzel(pos,e)
+            zParam.e[basei+i] = e
+            zParam.azel[basei+i] =azel
             if azel[1] < 10*np.pi/180 :
                 continue
 
@@ -139,11 +207,12 @@ class RTKPoistion():
             for j in range(len(obs.obsary[i].obsfrefList)):
                 #for k in range():
                 if (obs.obsary[i].obsfrefList[j].L > 0.0) :
-                    y[i][j] = obs.obsary[i].obsfrefList[j].L*lam[j] - r - dant[i]
+                    y[basei+i][j] = obs.obsary[i].obsfrefList[j].L*lam[j] - r - dant[i]
                 if (obs.obsary[i].obsfrefList[j].P > 0.0):
-                    y[i][j+nfre] = obs.obsary[i].obsfrefList[j].P -r - dant[i]
-
-        return 1
+                    y[basei+i][j+nfre] = obs.obsary[i].obsfrefList[j].P -r - dant[i]
+            zParam.y = y
+            zParam.state = 1
+        return zParam
     def tropmodel(self,time,pos,azel,humi):
         temp0 = 15
         if pos[2] <-100 or pos[2]>1E4 or azel[1] <= 0 :
@@ -238,9 +307,9 @@ class RTKPoistion():
     #self.updateState(rtkParam,satComList[0],satComList[1],satComList[2],len(satComList[0]),allNavList,allObs)
     def updateState(self,rtkParam,satList,irover,ibase,ns,nav,obs):
         tt = np.fabs(rtkParam.tt);
-        self.updos(rtkParam,tt)
-        self.upbias(rtkParam,tt,satList,irover,ibase,ns,nav,obs)
-        print()
+        rtkParam = self.updos(rtkParam,tt)
+        rtkParam = self.upbias(rtkParam,tt,satList,irover,ibase,ns,nav,obs)
+        return rtkParam
 
     def initX(self,rtkParam,xi,var,i):
         rtkParam.x[i][0] = xi
@@ -304,12 +373,58 @@ class RTKPoistion():
 
             self.detslp_gf(rtkParam,obs,irover[i],ibase[i],nav)
 
-        print()
+        for f in range(self.opt.nf):
+        #     for i in range(1,tool.MAXSAT+1):
+        #         a = rtkParam.ssatList[i-1].outc[f] +1
+        #         reset = 1 if a>self.opt.maxout else 0
+        #         if self.opt.modear == tool.ARMODE_INST
+            for i in range(ns):
+                j = self.IB(satList[i],f,self.opt)
+
+                rtkParam.P[j][j] += self.opt.prn[0]*self.opt.prn[0]*tt
+                slip = rtkParam.ssatList[satList[i]-1].slip[f]
+                if self.opt.ionomodel == 2 :
+                    slip |= rtkParam.ssatList[satList[i]-1].slip[1]
+                if self.opt.modear == 2 or (not (slip & 1)) :
+                    continue
+                rtkParam.x[j][0]= 0
+                rtkParam.ssatList[satList[i]-1].lock[f] = -self.opt.minlock
+
+            bias = tool.zeroMat(ns,1)
+            for i in range(ns):
+                j =0
+                offset = 0.0
+                if(self.opt.ionomodel != 2):
+                    cp = self.sdobs(obs,irover[i],ibase[i],f)
+                    pr = self.sdobs(obs,irover[i],ibase[i],f+tool.NFREQ)
+                    lami = tool.lam[f]
+                    if( cp == 0  or pr == 0 or lami == 0) :
+                        continue
+                    bias[i][0] = cp- (pr /lami)
+                else:
+                    print("")
+
+                ib = self.IB(satList[i],f,self.opt)
+                if( rtkParam.x[ib][0]  != 0):
+                    offset += bias[i][0]-rtkParam.x[ib][0]
+                    j+=1
+            if j > 0 :
+                for i in range(tool.MAXSAT):
+                    if(rtkParam.x[self.IB(i,f,self.opt)][0] != 0) :
+                        rtkParam.x[self.IB(i,f,self.opt)][0] += (offset/f)
+
+            for i in range(ns):
+                ib = self.IB(satList[i],f,self.opt)
+                if (bias[i][0] == 0.0) or (rtkParam.x[ib][0] !=0.0) :
+                    continue
+                self.initX(rtkParam,bias[i][0],self.opt.std[0]*self.opt.std[0],self.IB(satList[i],f,self.opt))
+        return rtkParam
+
 
     def updos(self,rtkParam,tt):
         Q = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
         pos = [0.0,0.0,0.0]
-        prn = [ 1E-4,1E-3,1E-4,1E-1,1E-2 ,0.0]
+
         if(tool.dot(rtkParam.getrr()) <= 0.0):
             for i in range(3):
                 self.initX(rtkParam,rtkParam.sol.rr[i],30*30,i)
@@ -340,8 +455,8 @@ class RTKPoistion():
         FP = tool.mulmatirix(rtkParam.nx,rtkParam.nx,rtkParam.nx,F,rtkParam.P,"TN")
         rtkParam.P = tool.mulmatirix(rtkParam.nx,rtkParam.nx,rtkParam.nx,FP,F,"TT")
         rtkParam.x = xp
-        Q[0] = Q[4] = prn[3]*prn[3]
-        Q[8] = prn[4]*prn[4]
+        Q[0] = Q[4] = self.opt.prn[3]*self.opt.prn[3]
+        Q[8] = self.opt.prn[4]*self.opt.prn[4]
         Qv=[]
         pos = RTKCOMMON.eceftopos(rtkParam.getrr(),pos)
         #print(pos)
@@ -350,7 +465,7 @@ class RTKPoistion():
         for i in range(3):
             for j in range(3):
                 rtkParam.P[i+6][j+6] += Qv[i+j*3]
-        print(rtkParam.x)
+        return rtkParam
 
     def convEcef(self,pos,Q):
         Qv = []
@@ -375,6 +490,95 @@ class RTKPoistion():
                 Qv.append(d)
         return Qv
             #EQ.append()
+
+    def baseline(self,xu,xr):
+        dr = []
+        for i in range(3):
+            dr.append(xu[i] - xr[i])
+        return tool.norm(dr,3)
+    def validobs(self,ir,ib,f,nf,y):
+
+        a = y[ir][f] != 0
+        b = y[ib][f] != 0
+        c = (True if f < nf else (y[ir][f-nf] != 0 and y[ib][f-nf]!=0))
+        return a and b and c
+
+    def ddres(self,rtkParam,nav,dt,satList,iRover,iBase,ns,zParam):
+        nf = self.opt.nf
+        nv = 0
+        posu = [0.0,0.0,0.0]
+        posr = [0.0, 0.0, 0.0]
+        xu = [zParam.xp[0][0],zParam.xp[1][0],zParam.xp[2][0]]
+        xr = rtkParam.refPoint
+        bl = self.baseline(xu,xr)
+        posu = RTKCOMMON.eceftopos(xu,posu)
+        posr = RTKCOMMON.eceftopos(xr,posr)
+        Ri = tool.zeroMat(ns*self.opt.nf*2+2,1)
+        Rj = tool.zeroMat(ns * self.opt.nf * 2 + 2, 1)
+        im = tool.zeroMat(ns,1)
+        tropu = tool.zeroMat(ns,1)
+        tropr = tool.zeroMat(ns,1)
+        dtdxu = tool.zeroMat(ns,3)
+        dtdxr = tool.zeroMat(ns,3)
+        for i in range(tool.MAXSAT):
+            for j in range(3):
+                rtkParam.ssatList[i].resp[j] = 0
+                rtkParam.ssatList[i].resc[j] = 0
+        #计算电离层、对流层延迟；
+        #for i in range(ns):
+        for m in range(2):
+            for f in range(nf*2):
+                i = -1
+                for j in range(ns):
+                    sysi = rtkParam.ssatList[satList[j]-1].sys
+                    #0 = gps/sbas/qzss，1=glo
+                    if((m == 0 and sysi == 1) or (m == 1 and sysi != 1)):
+                        continue
+                    if(not self.validobs(iRover[j],iBase[j],f,nf,zParam.y)) :
+                        continue
+                    if(i<0) :
+                        i = j
+                    elif(zParam.azel[iRover[j]][1] >= zParam.azel[iRover[i]][1]):
+                        i = j
+
+                if i < 0 : continue
+                for j in range(ns):
+                    sysi = rtkParam.ssatList[satList[i]-1].sys
+                    sysj = rtkParam.ssatList[satList[j]-1].sys
+                    if((m == 0 and sysj == 1) or (m == 1 and sysj != 1)) : continue
+                    if(not(self.validobs(iRover[j],iBase[j],f,nf,zParam.y))) : continue
+                    ff = np.mod(f,nf)
+                    lami = tool.lam[ff]
+                    lamj = tool.lam[ff]
+                    if lami <= 0 or lamj <= 0 : continue
+                    if zParam.H :
+                        Hi = zParam.H[nv*rtkParam.nx]
+                    zParam.v[nv][0] = (zParam.y[iRover[i]][f]-zParam.y[iBase[i]][f])\
+                                      -(zParam.y[iRover[j]][f] - zParam.y[iBase[j]][f])
+                    if zParam.H :
+                        for k in range(3):
+                            Hi[k] = -zParam.e[iRover[i]][k]+zParam.e[iRover[j][k]]
+                    if f < nf:
+                        if self.opt.ionomodel != 2:
+                            zParam.v[nv] -= lami*rtkParam.x[self.IB(satList[i],f,self.opt)][0]\
+                                            -lamj*rtkParam.x[self.IB(satList[j],f,self.opt)]
+                            if zParam.H:
+                                Hi[self.IB(satList[i],f,self.opt)] = lami
+                                Hi[self.IB(satList[j],f,self.opt)] = -lamj
+                        else:
+                            print()
+                    if f < nf :
+                        rtkParam.ssatList[satList[j]-1].resc[f] = zParam.v[nv]
+                    else:
+                        rtkParam.ssatList[satList[j] - 1].resp[f-nf] = zParam.v[nv]
+
+
+
+
+
+
+
+        return zParam
 
 
 

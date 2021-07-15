@@ -134,8 +134,8 @@ class SinglePointPosition():
             n = 4
             k = 4
             m = spparm.vn
-            print("H = ",spparm.e_matrix)
-            print("V = ",spparm.V)
+            #print("H = ",spparm.e_matrix)
+            #print("V = ",spparm.V)
             dx = tool.LSP(n, k, m, spparm.e_matrix, spparm.V, dx)
             for i in range(4):
                 X[i] += dx[i]
@@ -164,7 +164,7 @@ class SinglePointPosition():
             respList.append(0)
             # 伪距修正，根据卫星位置，减去估算的用户位置
             r = RTKCOMMON.r_corr(nav_list[i], rr)  # [nav_list[i].nav.x,nav_list[i].nav.y,nav_list[i].nav.z]
-            print("before r",r,"  rr = ",rr," RS = ",nav_list[i].x,nav_list[i].y,nav_list[i].z)
+            #print("before r",r,"  rr = ",rr," RS = ",nav_list[i].x,nav_list[i].y,nav_list[i].z)
             # 计算接收机相对于卫星位置的向量数组
             e = RTKCOMMON.e_corr(nav_list[i], rr)
             # 计算卫星的方位角和截止角
@@ -184,7 +184,7 @@ class SinglePointPosition():
             tropCorr = self.tropcorr(t_obs,pos,azelList[i],1)
             pCorr = self.prange(OBS_DATA,nav_list,azelList[i],i)
             #dtrp = 0
-            print("P =",pCorr[0], "  r=  ",r,"  "," dtr = ",dtr," nav_list[i].dts= ",nav_list[i].dts," ionCorr[0]= ",ionCorr[0]," tropCorr[0]= ",tropCorr[0])
+            #print("P =",pCorr[0], "  r=  ",r,"  "," dtr = ",dtr," nav_list[i].dts= ",nav_list[i].dts," ionCorr[0]= ",ionCorr[0]," tropCorr[0]= ",tropCorr[0])
             V[vn] = pCorr[0] - (r + dtr - tool.CLIGHT * nav_list[i].dts + ionCorr[0] + tropCorr[0])
             # 将e数组变乘以-1，主要是用于后续最小二乘法中去。并合并到大数组中，得到LSP需要的矩阵H
             for j in range(3):
@@ -286,8 +286,71 @@ class SinglePointPosition():
                 x = 2.0 * np.pi * (tt - 50400.0) / per
                 ion = tool.CLIGHT * f * ( (5E-9+amp * (1.0+x * x * (-0.5+x * x / 24.0))) if np.fabs(x) < 1.57 else 5E-9)
         var = ion *0.5 *ion*0.5
-        print("[ion,var]",ion,var)
+        #print("[ion,var]",ion,var)
         return [ion,var]
+    def resdop(self,obs,nav,sol,vsat,azel,x):
+        vn = 0
+        H = []
+        v = []
+        a = [[0.0],[0.0],[0.0]]
+        vs = [0,0,0]
+        pos = [0.0,0.0,0.0]
+        E9 = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
+        pos = RTKCOMMON.eceftopos( sol.rr,pos)
+        E9 = RTKCOMMON.xyz2enu(pos,E9)
+        E = []
+        for i in range(3):
+            Ei = []
+            for j in range(3):
+                Ei.append(E9[j+i*3])
+            E.append(Ei)
+
+        for i in range(len(obs.obsary)):
+            lam = tool.lam[0]
+            if obs.obsary[i].obsfrefList[0].D == 0.0 or lam == 0.0 or vsat[i] == 0 or tool.norm(nav[i].getVel(),3) <= 0.0 :
+                continue
+
+            cosel = np.cos(azel[i][1])
+            a[0][0] = np.sin(azel[i][0])*cosel
+            a[1][0] = np.cos(azel[i][0])*cosel
+            a[2][0] = np.sin(azel[i][1])
+
+            e = tool.mulmatirix(3,1,3,E,a,"NN")
+
+            for j in range(3):
+                vs[j] = nav[i].getVel()[j] -x[j]
+            rs = nav[i].getRS()
+            rate = tool.dot_n(vs,[e[0][0],e[1][0],e[2][0]],3)+(tool.OMGE / tool.CLIGHT) * (rs[4]*sol.rr[0] +rs[1]*x[0] -rs[3]*sol.rr[1] - rs[0]*x[1])
+            vi = -lam * obs.obsary[i].obsfrefList[0].D - (rate + x[3] -tool.CLIGHT*0)#dts[1],钟飘==0)
+            v.append([vi])
+            Hi = []
+            for j in range(4):
+                Hi.append(-e[j][0] if j < 3 else 1.0)
+            H.append(Hi)
+            vn += 1
+
+        #print(vn)
+        #print("vel H:",H)
+        #print(("vel v ",v))
+        return [vn,H,v]
+    def estvel(self,obs,nav,sol,vsat,azel):
+        x = [0.0,0.0,0.0,0.0]
+        for i in range(10):
+            velparam = self.resdop(obs,nav,sol,vsat,azel,x)
+            if velparam[0] <4 :
+                break
+
+            dx = tool.LSP(4,4,velparam[0],velparam[1],velparam[2],[])
+            for j in range(4):
+                x[j] += dx[j]
+
+            if(tool.norm(dx,4) < 1E-6):
+                for j in range(3):
+                    sol.rr[3+j] = x[j]
+                break
+        return sol
+
+
     def exesinglepoint(self, OBS_DATA, nav_data_list, rtkParam):
         sol = rtkParam.sol
         OBS_P = []
@@ -314,6 +377,8 @@ class SinglePointPosition():
         sol.init(OBS_DATA.gpsweek, OBS_DATA.t_obs)
         #rtkParam.updateSol(sol)
         sppparm = self.estpos(nav_list, OBS_DATA, sol)
+
+        self.estvel(OBS_DATA,nav_list,sol,sppparm.vsat,sppparm.azel)
         for i in range(tool.MAXSAT):
             rtkParam.ssatList[i].vs = 0
             rtkParam.ssatList[i].azel = [0.0,0.0]

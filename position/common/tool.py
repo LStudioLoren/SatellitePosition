@@ -2,7 +2,12 @@ import numpy as np
 import math as m
 from scipy import linalg
 #工具集
-MAXSAT = 116
+MAXGPS = 32#32-1+1
+MAXSBAS = 23#142-120+1
+MAXCMP = 35#35-1+1
+MAXQZSS = 3#195-193+1
+MAXGLO = 24#24-1+1
+MAXSAT = 117
 MAXFREF =243
 CLIGHT =299792458.0  #光速
 OMGE=7.2921151467E-5  #
@@ -22,13 +27,17 @@ FREQ2 = 1.22760E9
 NFREQ = 3
 #光速除以L1/L2的频率
 lam = [CLIGHT / FREQ1,CLIGHT / FREQ2]
-def dot_n(rr,n):
+
+ARMODE_INST = 2
+
+
+def dot_n(a,b,n):
     r = 0
     for i in range(n):
-        r+= rr[i]*rr[i]
+        r+= a[i]*b[i]
     return r
 def norm(rr,n):
-    return np.sqrt(dot_n(rr,n))
+    return np.sqrt(dot_n(rr,rr,n))
 
 
 def dot(rr):
@@ -36,6 +45,7 @@ def dot(rr):
 def dot2(rr):
     return rr[0]*rr[0]+rr[1]*rr[1]
 
+#创建一个n行，m列的0矩阵
 def zeroMat(n,m):
     A =[]
     for i in range(n):
@@ -44,7 +54,7 @@ def zeroMat(n,m):
             B.append(0)
         A.append(B)
     return A
-
+#创建一个n行，n列的00,11,22为1的矩阵
 def eyeMat(n):
     A = zeroMat(n,n)
     for i in range(n):
