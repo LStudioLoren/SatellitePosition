@@ -22,15 +22,21 @@ class POSTIONOPTION():
 
     '''
     def __init__(self):
+        self.mode = 2#0:single,1:dpgs,2:rtk
         self.nf = 2
         self.ionomodel = 1
         self.tropmodel = 1
         self.thresslip = 0.05
         self.maxout = 5
         self.modear = 1
+        self.maxinno = 30
         self.glomodear = 1
         self.dynamics = 1
         self.prn = [ 1E-4,1E-3,1E-4,1E-1,1E-2 ,0.0]
         self.minlock = 0
         self.std = [30.0,0.03,0.3]
         self.iter = 1
+        self.ena = [0,0,0,0]
+        self.err = [100.0,0.003,0.003,0.0,1.0]
+        self.sclkstab = 5E-12
+        self.eratio = [100.0,100.0]

@@ -16,6 +16,7 @@
 - tool.py：包含了一些常用的常参、数学方法等工具。
 - solution.py：包含定位结果、历元时间、解算卫星数、定位状态、age等信息。
 - RTKCOMMON.py：包含定位算法需要用到的公共方法。
+- OPTION.py：包含了一些参数配置。
 ### 2、singlepoint目录
 - \_\_init\_\_：初始化类
 - singlepoint.py：主函数。  

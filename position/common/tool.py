@@ -62,47 +62,67 @@ def eyeMat(n):
     return A
 
 #n列*m行  *  k列*m行
-def mulmatirix(n,k,m,A,B,type):
+#矩阵是A矩阵的行，乘以B矩阵的列，累加成行、列
+def mulmatirix(n,k,m,A,B,alpha,bate,type,Q):
     C = []
-    if type == "NN":
-        #n == m
-        for i in range(n):
-            dlist = []
-            for j in range(k):
-                d = 0
+    for i in range(n):
+        dlist = []
+        for j in range(k):
+            d = 0
+            if type == "NN":
                 for x in range(m):
-                    d+=A[i][x]*B[x][j]
-                dlist.append(d)
-            C.append(dlist)
-    #NT,k ==n
-    elif type == "NT":
-        for i in range(n):
-            dlist = []
-            for j in range(k):
-                d = 0
+                    d += A[i][x] * B[x][j]
+            elif type == "NT":
                 for x in range(m):
-                    d+=A[i][x]*B[j][x]
-                dlist.append(d)
-            C.append(dlist)
-    elif type =="TN":
-        for i in range(n):
-            dlist = []
-            for j in range(k):
-                d = 0
+                    d += A[i][x] * B[j][x]
+            elif type == "TN":
                 for x in range(m):
-                    d+=A[x][i]*B[x][j]
-                dlist.append(d)
-            C.append(dlist)
-    elif type == "TT":
-        for i in range(n):
-            dlist = []
-            for j in range(k):
-                d = 0
+                    d += A[x][i] * B[x][j]
+            elif type == "TT":
                 for x in range(m):
-                    d+=A[x][i]*B[j][x]
-                dlist.append(d)
-            C.append(dlist)
+                    d += A[x][i] * B[j][x]
+
+            if bate != 0:
+                d = alpha*d + Q[i][j]
+            else:
+                d = alpha*d
+            dlist.append(d)
+        C.append(dlist)
+    # # NT,k ==n
+    #
+    #     for i in range(n):
+    #         dlist = []
+    #         for j in range(k):
+    #             d = 0
+    #
+    #             if bate != 0:
+    #                 d += Q[i][j]
+    #             dlist.append(d)
+    #         C.append(dlist)
+    #
+    #     for i in range(n):
+    #         dlist = []
+    #         for j in range(k):
+    #             d = 0
+    #
+    #             if bate != 0:
+    #                 d += Q[i][j]
+    #             dlist.append(d)
+    #         C.append(dlist)
+    #
+    #     for i in range(n):
+    #         dlist = []
+    #         for j in range(k):
+    #             d = 0
+    #
+    #             if bate != 0:
+    #                 d += Q[i][j]
+    #             dlist.append(d)
+    #         C.append(dlist)
     return C
+# def mulmatirix(n,k,m,A,B,type):
+#     Q = []
+#     return mulmatirix2(n,k,m,A,B,0,type,Q)
 
 
 
@@ -150,15 +170,17 @@ def LSP(n,k,m,A,y,C):
     #A*dx=y[p-r]  -》A*dx-y = 0
     #根据矩阵
     #Ay = A^T*y,A^T的倒转*y
-    Ay = mulmatirix(n,1,m,A,y,"TN")
+    #A矩阵输入进来是 M行，N列矩阵，需要倒转
+    Ay = mulmatirix(n,1,m,A,y,1,0,"TN",[])
     #Q = A^t*A
     #Q = mulmatirix_multi(n,k,m,A,A)
-    Q = mulmatirix(n,k,m,A,A,"TN")
+    Q = mulmatirix(n,k,m,A,A,1,0,"TN",[])
+    print("Q = ",Q)
     #Q_1 = Q inv,Q-1
     #这个是将A^T*A求逆
     Q_1 = np.linalg.inv(Q)
     #这里是求Q^-1 * Ay
-    C = mulmatirix(n,1,n,Q_1,Ay,"NN")
+    C = mulmatirix(n,1,n,Q_1,Ay,1,0,"NN",[])
     #C数组是 一个 n列*1行的二维数组，因此此次将其重新编辑为一维数组
     C2 = []
     for i in range(len(C)):

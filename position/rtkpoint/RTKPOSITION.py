@@ -52,6 +52,7 @@ class zdresParam():
         self.R = []
         self.nv = 0
         self.bias=[]
+        self.filterinfo = 0
     def init(self,nf,n):
         self.y = tool.zeroMat(n,nf*2)
         self.azel = tool.zeroMat(n,2)
@@ -59,7 +60,7 @@ class zdresParam():
         self.vflg = tool.zeroMat(64*2*2+1,1)
         return self
     def init2(self,ny,nx):
-        self.Pp = tool.zeroMat(nx,nx)
+        #self.Pp = tool.zeroMat(nx,nx)
         self.xa = tool.zeroMat(nx,1)
         self.v = tool.zeroMat(ny,1)
         self.H = tool.zeroMat(nx,ny)
@@ -70,21 +71,21 @@ class zdresParam():
 
 class RTKPoistion():
     def NP(self,opt):
-        return 3 if opt.dynamics == 0 else 9
+        return 3 if opt.dynamics == 0 else 9  #9
 
     def NI(self,opt):
-        return 0 if opt.ionomodel != 4 else tool.MAXSAT
+        return 0 if opt.ionomodel != 4 else tool.MAXSAT  #0
 
     def NT(self,opt):
-        return 0 if opt.tropmodel < 3 else 6
+        return 0 if opt.tropmodel < 3 else 6 #0
 
     def NL(self,opt):
-        return 0 if opt.glomodear != 2 else 2
+        return 0 if opt.glomodear != 2 else 2  #0
     def NR(self,opt):
-        return self.NP(opt)+self.NI(opt)+self.NT(opt)+self.NL(opt)
+        return self.NP(opt)+self.NI(opt)+self.NT(opt)+self.NL(opt)  #9
 
     def IB(self,s,f,opt):
-        return self.NR(opt)+tool.MAXSAT*f+s-1
+        return self.NR(opt)+tool.MAXSAT*f+s-1   #9+s-1+117
 
     def __init__(self):
         self.opt = OPTION.POSTIONOPTION()
@@ -127,8 +128,8 @@ class RTKPoistion():
         rtkParam = self.updateState(rtkParam,satComList[0],satComList[1],satComList[2],len(satComList[0]),allNavList,allObs)
         niter = self.opt.iter
 
-        xp = rtkParam.x
-        zParam.xp = xp
+        #xp =
+        zParam.xp = rtkParam.x
         ny = len(satComList[0]) * self.opt.nf * 2 + 2
         zParam = zParam.init2(ny, rtkParam.nx)
         for i in range(niter):
@@ -136,8 +137,12 @@ class RTKPoistion():
             if zParam.state != 1:
                 break
             zParam = self.ddres(rtkParam,allNavList,0,satComList[0],satComList[1],satComList[2],len(satComList[0]),zParam)
-            if zParam.state != 1:
+            if zParam.nv <=0 :
                 break
+
+            zParam.Pp = rtkParam.P
+            self.filter(zParam, rtkParam.nx, zParam.nv)
+
 
 
 
@@ -451,9 +456,9 @@ class RTKPoistion():
         for i in range(6):
             F[i][i+3] = tt
         #print(rtkParam.x)
-        xp = tool.mulmatirix(rtkParam.nx,1,rtkParam.nx,F,rtkParam.x,"TN")
-        FP = tool.mulmatirix(rtkParam.nx,rtkParam.nx,rtkParam.nx,F,rtkParam.P,"TN")
-        rtkParam.P = tool.mulmatirix(rtkParam.nx,rtkParam.nx,rtkParam.nx,FP,F,"TT")
+        xp = tool.mulmatirix(rtkParam.nx,1,rtkParam.nx,F,rtkParam.x,1,0,"TN",[])
+        FP = tool.mulmatirix(rtkParam.nx,rtkParam.nx,rtkParam.nx,F,rtkParam.P,1,0,"TN",[])
+        rtkParam.P = tool.mulmatirix(rtkParam.nx,rtkParam.nx,rtkParam.nx,FP,F,1,0,"TT",[])
         rtkParam.x = xp
         Q[0] = Q[4] = self.opt.prn[3]*self.opt.prn[3]
         Q[8] = self.opt.prn[4]*self.opt.prn[4]
@@ -505,7 +510,7 @@ class RTKPoistion():
 
     def ddres(self,rtkParam,nav,dt,satList,iRover,iBase,ns,zParam):
         nf = self.opt.nf
-        nv = 0
+        b = 0
         posu = [0.0,0.0,0.0]
         posr = [0.0, 0.0, 0.0]
         xu = [zParam.xp[0][0],zParam.xp[1][0],zParam.xp[2][0]]
@@ -520,6 +525,9 @@ class RTKPoistion():
         tropr = tool.zeroMat(ns,1)
         dtdxu = tool.zeroMat(ns,3)
         dtdxr = tool.zeroMat(ns,3)
+        nb = []
+        for i in range(tool.NFREQ*2*2+2):
+            nb.append(0)
         for i in range(tool.MAXSAT):
             for j in range(3):
                 rtkParam.ssatList[i].resp[j] = 0
@@ -543,6 +551,7 @@ class RTKPoistion():
 
                 if i < 0 : continue
                 for j in range(ns):
+                    if i == j : continue
                     sysi = rtkParam.ssatList[satList[i]-1].sys
                     sysj = rtkParam.ssatList[satList[j]-1].sys
                     if((m == 0 and sysj == 1) or (m == 1 and sysj != 1)) : continue
@@ -551,34 +560,138 @@ class RTKPoistion():
                     lami = tool.lam[ff]
                     lamj = tool.lam[ff]
                     if lami <= 0 or lamj <= 0 : continue
-                    if zParam.H :
-                        Hi = zParam.H[nv*rtkParam.nx]
-                    zParam.v[nv][0] = (zParam.y[iRover[i]][f]-zParam.y[iBase[i]][f])\
+                    # Hi = []
+                    # if zParam.H :
+                    #     for h in range(rtkParam.nx):
+                    #         Hi.append(zParam.H[h][zParam.nv])
+                    #     #Hi = zParam.H[zParam.nv*rtkParam.nx]
+                    zParam.v[zParam.nv][0] = (zParam.y[iRover[i]][f]-zParam.y[iBase[i]][f])\
                                       -(zParam.y[iRover[j]][f] - zParam.y[iBase[j]][f])
                     if zParam.H :
                         for k in range(3):
-                            Hi[k] = -zParam.e[iRover[i]][k]+zParam.e[iRover[j][k]]
+                            #Hi[k] = -zParam.e[iRover[i]][k]+zParam.e[iRover[j]][k]
+                            zParam.H[k][zParam.nv] = -zParam.e[iRover[i]][k] + zParam.e[iRover[j]][k]
                     if f < nf:
                         if self.opt.ionomodel != 2:
-                            zParam.v[nv] -= lami*rtkParam.x[self.IB(satList[i],f,self.opt)][0]\
-                                            -lamj*rtkParam.x[self.IB(satList[j],f,self.opt)]
+                            zParam.v[zParam.nv][0] -= lami*rtkParam.x[self.IB(satList[i],f,self.opt)][0]\
+                                            -lamj*rtkParam.x[self.IB(satList[j],f,self.opt)][0]
                             if zParam.H:
-                                Hi[self.IB(satList[i],f,self.opt)] = lami
-                                Hi[self.IB(satList[j],f,self.opt)] = -lamj
+                                zParam.H[self.IB(satList[i],f,self.opt)][zParam.nv] = lami
+                                zParam.H[self.IB(satList[j],f,self.opt)][zParam.nv] = -lamj
                         else:
                             print()
                     if f < nf :
-                        rtkParam.ssatList[satList[j]-1].resc[f] = zParam.v[nv]
+                        rtkParam.ssatList[satList[j]-1].resc[f] = zParam.v[zParam.nv][0]
                     else:
-                        rtkParam.ssatList[satList[j] - 1].resp[f-nf] = zParam.v[nv]
+                        rtkParam.ssatList[satList[j] - 1].resp[f-nf] = zParam.v[zParam.nv][0]
 
+                    if(self.opt.maxinno  > 0 and np.fabs(zParam.v[zParam.nv][0])> self.opt.maxinno):
+                        if f < nf:
+                            rtkParam.ssatList[satList[i]-1].rejc[f] += 1
+                            rtkParam.ssatList[satList[j]-1].rejc[f] += 1
+                        continue
 
+                    Ri[zParam.nv][0] = self.varerr(satList[i],sysi,zParam.azel[iRover[i]][1],bl,dt,f,self.opt)
+                    Rj[zParam.nv][0] = self.varerr(satList[j],sysj,zParam.azel[iRover[j]][1],bl,dt,f,self.opt)
+                    if self.opt.mode > 1 :
+                        if f < nf :
+                            rtkParam.ssatList[satList[i]-1].vsat[f] = 1
+                            rtkParam.ssatList[satList[j]-1].vsat[f] = 1
+                        else:
+                            rtkParam.ssatList[satList[i] - 1].vsat[f-nf] = 1
+                            rtkParam.ssatList[satList[j] - 1].vsat[f-nf] = 1
+                    zParam.vflg[zParam.nv][0] = (satList[i]<<16)|(satList[j]<<8)|((0 if f < nf else 1)<<4)|(np.mod(f,nf))
+                    nb[b] += 1
+                    zParam.nv+=1
 
-
-
-
+                if f < nf:
+                    s = 0
+                    for j in range(tool.MAXSAT):
+                        s += rtkParam.ssatList[j].resc[f]
+                    s /= (nb[b] +1)
+                    for j in range(tool.MAXSAT):
+                        if j == (satList[i]-1) or rtkParam.ssatList[j].resc[f] != 0 :
+                            rtkParam.ssatList[j].resc[f] -= s
+                else:
+                    s = 0
+                    for j in range(tool.MAXSAT):
+                        s += rtkParam.ssatList[j].resp[f-nf]
+                    s /= (nb[b] + 1)
+                    for j in range(tool.MAXSAT):
+                        if j == (satList[i] - 1) or rtkParam.ssatList[j].resp[f-nf] != 0:
+                            rtkParam.ssatList[j].resp[f-nf] -= s
+                b +=1
+            zParam = self.ddcov(nb,b,Ri,Rj,zParam)
+        return zParam
+    def ddcov(self,nb,n,Ri,Rj,zParam):
+        for i in range(zParam.nv):
+            for j in range(zParam.nv):
+                zParam.R[i][j] = 0
+        k = 0
+        for b in range(n):
+            for i in range(nb[b]):
+                for j in range(nb[b]):
+                    zParam.R[k+j][k+i] = (Ri[k+i][0]+(Rj[k+i][0] if i == j else 0))
+            k+=nb[b]
 
         return zParam
+    def varerr(self,satNo,sys,el,bl,dt,f,opt):
+        a = b = c = opt.err[3]*bl/1E4
+        d = tool.CLIGHT*opt.sclkstab*dt
+        fact = 1
+        nf = opt.nf
+        sinel = np.sin(el)
+
+        if(f >= nf and opt.ena[0] > 0):
+            print()
+        elif(f < nf and opt.ena[1] > 0):
+            print()
+        else:
+            if(f >= nf) : fact = opt.eratio[f - nf]
+            if(fact <= 0) : fact = opt.eratio[0]
+            fact *= 1
+            a = fact * opt.err[1]
+            b = fact * opt.err[2]
+        return 2.0* (3 if opt.ionomodel == 2 else 1)*(a*a +b*b/sinel/sinel +c*c) +d*d
+
+    def filter(self,zParam,n,m):
+        ix = tool.zeroMat(n,1)
+        k = 0
+        for i in range(n):
+            if zParam.xp[i][0] != 0 and zParam.Pp[i][i] > 0 :
+                ix[k][0] = i
+                k += 1
+        x_ = tool.zeroMat(k,1)
+        xp_ = tool.zeroMat(k,1)
+        P_ = tool.zeroMat(k,k)
+        Pp_ = tool.zeroMat(k,k)
+        H_ = tool.zeroMat(k,m)
+        I = tool.eyeMat(k)
+        for i in range(k):
+            x_[i][0] = zParam.xp[ix[i][0]][0]
+            for j in range(k):
+                P_[i][j] = zParam.Pp[ix[i][0]][ix[j][0]]
+            for j in range(m):
+                H_[i][j] = zParam.H[ix[i][0]][j]
+        Q = zParam.R
+        xp_ = x_
+        #Q = H_t * P_t * H + R
+        F = tool.mulmatirix(k,m,k,P_,H_,1,0,"TN",[])#F:k行m列
+        Q = tool.mulmatirix(m,m,k,H_,F,1,1,"TN",Q)#Q：k行K列
+
+        Q_1 = np.linalg.inv(Q)
+        # K = F * Q_1
+        K = tool.mulmatirix(k,m,m,F,Q_1,1,0,"NT",[])#K k col m row
+        zParam.xp = tool.mulmatirix(k,1,m,K,zParam.v,1,1,"NN",zParam.xp)  #xp: k col,1 rows
+        I = tool.mulmatirix(k,k,m,K,H_,-1,1,"NT",I) # I: k col k row
+        zParam.Pp = tool.mulmatirix(k,k,k,I,P_,1,0,"NN",[])
+        print()
+
+
+
+
+
+
 
 
 

@@ -136,6 +136,7 @@ class SinglePointPosition():
             m = spparm.vn
             #print("H = ",spparm.e_matrix)
             #print("V = ",spparm.V)
+            #n列，m行矩阵，乘以K列M行
             dx = tool.LSP(n, k, m, spparm.e_matrix, spparm.V, dx)
             for i in range(4):
                 X[i] += dx[i]
@@ -315,7 +316,7 @@ class SinglePointPosition():
             a[1][0] = np.cos(azel[i][0])*cosel
             a[2][0] = np.sin(azel[i][1])
 
-            e = tool.mulmatirix(3,1,3,E,a,"NN")
+            e = tool.mulmatirix(3,1,3,E,a,1,0,"NN",[])
 
             for j in range(3):
                 vs[j] = nav[i].getVel()[j] -x[j]
