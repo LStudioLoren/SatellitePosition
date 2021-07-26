@@ -34,6 +34,9 @@ class Nav():
     x = 0
     y = 0
     z = 0
+    vx = 0
+    vy = 0
+    vz = 0
 
     # 星历数据
     nav = 0
@@ -41,10 +44,22 @@ class Nav():
     dts = 0
     # 方差
     vare = 0
-    def updateParam(self,x,y,z,newDts,newVare):
+
+    def getRS(self):
+        rs = [self.x,self.y,self.z,self.vx,self.vy,self.vz]
+        return rs
+    def getVel(self):
+        return [self.vx,self.vy,self.vz]
+
+    def getPos(self):
+        return [self.x,self.y,self.z]
+    def updateParam(self,x,y,z,vx,vy,vz,newDts,newVare):
         self.x = x
         self.y = y
         self.z = z
+        self.vx = vx
+        self.vy = vy
+        self.vz = vz
         self.dts = newDts
         self.vare = newVare
 

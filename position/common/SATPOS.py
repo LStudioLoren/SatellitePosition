@@ -16,7 +16,7 @@ class SatPos():
         #        t_obs - navData.t_toc)
         # print("delta_t = ",delta_t)
         tk = t_obs - navData.toe
-        # print("tk = t_obs - delta_t - toe",tk)
+        #print("tk = ",tk)
         Mk = navData.M0 + n * tk
         # print("信号发射时卫星的平近点角Mk：", Mk,"  M0  = ",M0)
         ed = Mk
@@ -41,10 +41,10 @@ class SatPos():
         uk = u + delta_u
         rk = (navData.Sqrt_A * navData.Sqrt_A) * (1 - navData.e * np.cos(Ek)) + delta_r
         ik = navData.i0 + delta_i + navData.IDOT * tk
-
+        #print(uk,rk,ik)
         x = rk * np.cos(uk)
         y = rk * np.sin(uk)
-        # print("x = ",x, "y = ", y)
+        #print("x = ",x, "y = ", y)
 
         L = navData.OMEGA + (navData.OMEGA_DOT - tool.EARTH_RAD) * tk - tool.EARTH_RAD * navData.toe
 
@@ -67,10 +67,10 @@ class SatPos():
         vare = navData.SAV * navData.SAV
         #print(navData.prn, "dts = ", dts, "vare = ", vare)
         #print("Xs = ", Xs, " Ys = ", Ys, " Zs = ", Zs)
-        navData.updateParam(Xs, Ys, Zs, dts, vare)
+        #navData.updateParam(Xs, Ys, Zs, dts, vare)
         # navData.updataDtsAndVare()
         # navData.updataVare(vare)
-        return navData
+        return [Xs, Ys, Zs, dts, vare]
 
     def getSatpos(self,navData, t_obs, OBS_P):
         # 根据观测量的伪距，除以光速，算出时差
@@ -82,7 +82,15 @@ class SatPos():
         dt = self.ephclk(t_obs,t_sol,navData)
         # 更新星历的toc时间,减去钟差
         t_obs -=dt
-        navData = self.nav2pos(t_obs,navData)
+
+        navData2 = navData
+
+        navData1 = self.nav2pos(t_obs,navData)
+        t_obs += 1E-3
+        navData2 = self.nav2pos(t_obs, navData)
+        # += 0.1
+        #navData2 = self.nav2pos(t_obs,navDataTemp)
+        navData.updateParam(navData1[0],navData1[1],navData1[2],((navData2[0] - navData1[0])/1E-3),((navData2[1] - navData1[1])/1E-3),((navData2[2] - navData1[2])/1E-3),navData1[3],navData1[4])
         return navData
 
     def eph2clk(self,ts_obs,navData):

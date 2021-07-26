@@ -2,7 +2,12 @@ import numpy as np
 import math as m
 from scipy import linalg
 #工具集
-MAXSAT = 116
+MAXGPS = 32#32-1+1
+MAXSBAS = 23#142-120+1
+MAXCMP = 35#35-1+1
+MAXQZSS = 3#195-193+1
+MAXGLO = 24#24-1+1
+MAXSAT = 117
 MAXFREF =243
 CLIGHT =299792458.0  #光速
 OMGE=7.2921151467E-5  #
@@ -16,13 +21,23 @@ EARTH_RAD = 7.2921151467E-5   #地球自转常数EARTH_RAD
 FREQ1 = 1.57542E9
 #L2的频率
 FREQ2 = 1.22760E9
-def dot_n(rr,n):
+
+
+#NFREQ,最大载波频点
+NFREQ = 3
+#光速除以L1/L2的频率
+lam = [CLIGHT / FREQ1,CLIGHT / FREQ2]
+
+ARMODE_INST = 2
+
+
+def dot_n(a,b,n):
     r = 0
     for i in range(n):
-        r+= rr[i]*rr[i]
+        r+= a[i]*b[i]
     return r
 def norm(rr,n):
-    return np.sqrt(dot_n(rr,n))
+    return np.sqrt(dot_n(rr,rr,n))
 
 
 def dot(rr):
@@ -30,6 +45,7 @@ def dot(rr):
 def dot2(rr):
     return rr[0]*rr[0]+rr[1]*rr[1]
 
+#创建一个n行，m列的0矩阵
 def zeroMat(n,m):
     A =[]
     for i in range(n):
@@ -38,55 +54,75 @@ def zeroMat(n,m):
             B.append(0)
         A.append(B)
     return A
-
+#创建一个n行，n列的00,11,22为1的矩阵
 def eyeMat(n):
     A = zeroMat(n,n)
     for i in range(n):
         A[i][i] = 1
     return A
 
-#n列*m行  *  k列*m行
-def mulmatirix(n,k,m,A,B,type):
+#输入n列*m行 A矩阵  *  k列*m行 B矩阵，输出N列*K行的C矩阵。
+#矩阵是A矩阵的行，乘以B矩阵的列，累加成行、列
+def mulmatirix(n,k,m,A,B,alpha,bate,type,Q):
     C = []
-    if type == "NN":
-        #n == m
-        for i in range(n):
-            dlist = []
-            for j in range(k):
-                d = 0
+    for i in range(n):
+        dlist = []
+        for j in range(k):
+            d = 0
+            if type == "NN":
                 for x in range(m):
-                    d+=A[i][x]*B[x][j]
-                dlist.append(d)
-            C.append(dlist)
-    #NT,k ==n
-    elif type == "NT":
-        for i in range(n):
-            dlist = []
-            for j in range(k):
-                d = 0
+                    d += A[i][x] * B[x][j]
+            elif type == "NT":
                 for x in range(m):
-                    d+=A[i][x]*B[j][x]
-                dlist.append(d)
-            C.append(dlist)
-    elif type =="TN":
-        for i in range(n):
-            dlist = []
-            for j in range(k):
-                d = 0
+                    d += A[i][x] * B[j][x]
+            elif type == "TN":
                 for x in range(m):
-                    d+=A[x][i]*B[x][j]
-                dlist.append(d)
-            C.append(dlist)
-    elif type == "TT":
-        for i in range(n):
-            dlist = []
-            for j in range(k):
-                d = 0
+                    d += A[x][i] * B[x][j]
+            elif type == "TT":
                 for x in range(m):
-                    d+=A[x][i]*B[j][x]
-                dlist.append(d)
-            C.append(dlist)
+                    d += A[x][i] * B[j][x]
+
+            if bate != 0:
+                d = alpha*d + Q[i][j]
+            else:
+                d = alpha*d
+            dlist.append(d)
+        C.append(dlist)
+    # # NT,k ==n
+    #
+    #     for i in range(n):
+    #         dlist = []
+    #         for j in range(k):
+    #             d = 0
+    #
+    #             if bate != 0:
+    #                 d += Q[i][j]
+    #             dlist.append(d)
+    #         C.append(dlist)
+    #
+    #     for i in range(n):
+    #         dlist = []
+    #         for j in range(k):
+    #             d = 0
+    #
+    #             if bate != 0:
+    #                 d += Q[i][j]
+    #             dlist.append(d)
+    #         C.append(dlist)
+    #
+    #     for i in range(n):
+    #         dlist = []
+    #         for j in range(k):
+    #             d = 0
+    #
+    #             if bate != 0:
+    #                 d += Q[i][j]
+    #             dlist.append(d)
+    #         C.append(dlist)
     return C
+# def mulmatirix(n,k,m,A,B,type):
+#     Q = []
+#     return mulmatirix2(n,k,m,A,B,0,type,Q)
 
 
 
@@ -128,21 +164,27 @@ eX = P-r
 X = (e*e_t)^-1(P-r)*e_t
 
 '''
-
-def LSP(n,k,m,A,y,C):
+#A:
+# x1 y1 z1 c1
+# x2 y2 z2 c2
+# ....
+#xn yn zn cn
+def LSQ(n,k,m,A,y,C):
     #dx = (A^T*A)^-1  *  (A^T *y)
     #A*dx=y[p-r]  -》A*dx-y = 0
     #根据矩阵
     #Ay = A^T*y,A^T的倒转*y
-    Ay = mulmatirix(n,1,m,A,y,"TN")
+    #A矩阵输入进来是 M行，N列矩阵，需要倒转
+    Ay = mulmatirix(n,1,m,A,y,1,0,"TN",[])
     #Q = A^t*A
     #Q = mulmatirix_multi(n,k,m,A,A)
-    Q = mulmatirix(n,k,m,A,A,"TN")
+    Q = mulmatirix(n,k,m,A,A,1,0,"TN",[])
+    print("Q = ",Q)
     #Q_1 = Q inv,Q-1
     #这个是将A^T*A求逆
     Q_1 = np.linalg.inv(Q)
     #这里是求Q^-1 * Ay
-    C = mulmatirix(n,1,n,Q_1,Ay,"NN")
+    C = mulmatirix(n,1,n,Q_1,Ay,1,0,"NN",[])
     #C数组是 一个 n列*1行的二维数组，因此此次将其重新编辑为一维数组
     C2 = []
     for i in range(len(C)):

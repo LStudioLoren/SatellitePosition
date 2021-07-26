@@ -6,7 +6,9 @@ class SSAT():
         self.sys = 0 #gps:0,glo:1,bds:2,GAL:3
         self.vs = 0
         self.azel = [0.0,0.0]
+        #伪距残差pseudorange
         self.resp = [0.0,0.0,0.0]
+        #载波残差carrier-phase
         self.resc = [0.0,0.0,0.0]
         self.vsat = [0.0,0.0,0.0]
         self.snr = [0.0, 0.0, 0.0]
@@ -97,6 +99,10 @@ def xyz2enu(pos,E9):
     COSP = np.cos(pos[0])
     SINL = np.sin(pos[1])
     COSL = np.cos(pos[1])
+    #0 1 2是x
+    # 0 3 6
+    # 1 4 7
+    # 2 5 8
     E9[0] = -SINL
     E9[1] = -SINP * COSL
     E9[2] = COSP * COSL
