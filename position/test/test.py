@@ -1,5 +1,14 @@
 from position.common import *
 import numpy as np
+a = 65
+b = 0xFC
+print(a&b)
+
+
+a = 1
+b = a << 6
+#0000 0001 0100 0000
+print(a,b)
 
 a = 1
 b = 0x4
@@ -63,3 +72,20 @@ q = tool.mulmatirix(4,1,4,A,c,"NN")
 print(q)
 
 '''
+class aa():
+    def __init__(self):
+        self.aa = 10
+class aaaa():
+    def __init__(self):
+        self.a =0
+    def change(self,aa):
+        aa.aa = 1000
+    def change2(self,aa):
+        print(aa.aa)
+        self.change(aa)
+        print(aa.aa)
+if __name__ == '__main__':
+    aaa = aaaa()
+    a = aa()
+    aaa.change2(a)
+

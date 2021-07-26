@@ -18,6 +18,60 @@ class POSTIONOPTION():
     {0},{0},{0},                /* baseline,ru,rb */
     {"",""},                    /* anttype */
     {{0}},{{0}},{0}             /* antdel,pcv,exsats */
+    typedef struct {        /* processing options type */
+    int mode;           /* positioning mode (PMODE_???) */
+    int soltype;        /* solution type (0:forward,1:backward,2:combined) */
+    int nf;             /* number of frequencies (1:L1,2:L1+L2,3:L1+L2+L5) */
+    int navsys;         /* navigation system */
+    double elmin;       /* elevation mask angle (rad) */
+    snrmask_t snrmask;  /* SNR mask */
+    int sateph;         /* satellite ephemeris/clock (EPHOPT_???) */
+    int modear;         /* AR mode (0:off,1:continuous,2:instantaneous,3:fix and hold,4:ppp-ar) */
+    int glomodear;      /* GLONASS AR mode (0:off,1:on,2:auto cal,3:ext cal) */
+    int maxout;         /* obs outage count to reset bias */
+    int minlock;        /* min lock count to fix ambiguity */
+    int minfix;         /* min fix count to hold ambiguity */
+    int ionoopt;        /* ionosphere option (IONOOPT_???) */
+    int tropopt;        /* troposphere option (TROPOPT_???) */
+    int dynamics;       /* dynamics model (0:none,1:velociy,2:accel) */
+    int tidecorr;       /* earth tide correction (0:off,1:solid,2:solid+otl+pole) */
+    int niter;          /* number of filter iteration */
+    int codesmooth;     /* code smoothing window size (0:none) */
+    int intpref;        /* interpolate reference obs (for post mission) */
+    int sbascorr;       /* SBAS correction options */
+    int sbassatsel;     /* SBAS satellite selection (0:all) */
+    int rovpos;         /* rover position for fixed mode */
+    int refpos;         /* base position for relative mode */
+                        /* (0:pos in prcopt,  1:average of single pos, */
+                        /*  2:read from file, 3:rinex header, 4:rtcm pos) */
+    double eratio[NFREQ]; /* code/phase error ratio */
+    double err[5];      /* measurement error factor */
+                        /* [0]:reserved */
+                        /* [1-3]:error factor a/b/c of phase (m) */
+                        /* [4]:doppler frequency (hz) */
+    double std[3];      /* initial-state std [0]bias,[1]iono [2]trop */
+    double prn[5];      /* process-noise std [0]bias,[1]iono [2]trop [3]acch [4]accv */
+    double sclkstab;    /* satellite clock stability (sec/sec) */
+    double thresar[4];  /* AR validation threshold */
+    double elmaskar;    /* elevation mask of AR for rising satellite (deg) */
+    double elmaskhold;  /* elevation mask to hold ambiguity (deg) */
+    double thresslip;   /* slip threshold of geometry-free phase (m) */
+    double maxtdiff;    /* max difference of time (sec) */
+    double maxinno;     /* reject threshold of innovation (m) */
+    double maxgdop;     /* reject threshold of gdop */
+    double baseline[2]; /* baseline length constraint {const,sigma} (m) */
+    double ru[3];       /* rover position for fixed mode {x,y,z} (ecef) (m) */
+    double rb[3];       /* base position for relative mode {x,y,z} (ecef) (m) */
+    char anttype[2][MAXANT]; /* antenna types {rover,base} */
+    double antdel[2][3]; /* antenna delta {{rov_e,rov_n,rov_u},{ref_e,ref_n,ref_u}} */
+    pcv_t pcvr[2];      /* receiver antenna parameters {rov,base} */
+    unsigned char exsats[MAXSAT]; /* excluded satellites (1:excluded,2:included) */
+    char rnxopt[2][256]; /* rinex options {rover,base} */
+    int  posopt[6];     /* positioning options */
+    int  syncsol;       /* solution sync mode (0:off,1:on) */
+    double odisp[2][6*11]; /* ocean tide loading parameters {rov,base} */
+    exterr_t exterr;    /* extended receiver error model */
+} prcopt_t;
 };
 
     '''
@@ -40,3 +94,4 @@ class POSTIONOPTION():
         self.err = [100.0,0.003,0.003,0.0,1.0]
         self.sclkstab = 5E-12
         self.eratio = [100.0,100.0]
+        self.thresar = [3.0,0.9999,0.20]

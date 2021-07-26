@@ -61,7 +61,7 @@ def eyeMat(n):
         A[i][i] = 1
     return A
 
-#n列*m行  *  k列*m行
+#输入n列*m行 A矩阵  *  k列*m行 B矩阵，输出N列*K行的C矩阵。
 #矩阵是A矩阵的行，乘以B矩阵的列，累加成行、列
 def mulmatirix(n,k,m,A,B,alpha,bate,type,Q):
     C = []
@@ -164,8 +164,12 @@ eX = P-r
 X = (e*e_t)^-1(P-r)*e_t
 
 '''
-
-def LSP(n,k,m,A,y,C):
+#A:
+# x1 y1 z1 c1
+# x2 y2 z2 c2
+# ....
+#xn yn zn cn
+def LSQ(n,k,m,A,y,C):
     #dx = (A^T*A)^-1  *  (A^T *y)
     #A*dx=y[p-r]  -》A*dx-y = 0
     #根据矩阵

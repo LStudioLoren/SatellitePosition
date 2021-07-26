@@ -137,7 +137,7 @@ class SinglePointPosition():
             #print("H = ",spparm.e_matrix)
             #print("V = ",spparm.V)
             #n列，m行矩阵，乘以K列M行
-            dx = tool.LSP(n, k, m, spparm.e_matrix, spparm.V, dx)
+            dx = tool.LSQ(n, k, m, spparm.e_matrix, spparm.V, dx)
             for i in range(4):
                 X[i] += dx[i]
 
@@ -341,7 +341,7 @@ class SinglePointPosition():
             if velparam[0] <4 :
                 break
 
-            dx = tool.LSP(4,4,velparam[0],velparam[1],velparam[2],[])
+            dx = tool.LSQ(4,4,velparam[0],velparam[1],velparam[2],[])
             for j in range(4):
                 x[j] += dx[j]
 
@@ -380,6 +380,7 @@ class SinglePointPosition():
         sppparm = self.estpos(nav_list, OBS_DATA, sol)
 
         self.estvel(OBS_DATA,nav_list,sol,sppparm.vsat,sppparm.azel)
+        #初始化rtkparam中的ssatlist数据，以最大卫星数创建对应每个卫星的参数（移动站的）。
         for i in range(tool.MAXSAT):
             rtkParam.ssatList[i].vs = 0
             rtkParam.ssatList[i].azel = [0.0,0.0]

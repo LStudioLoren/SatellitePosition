@@ -17,7 +17,7 @@ class Obsfref():
     S = 0
     # CODE
     CODE = 0
-
+    #pseudorange, phase, LLI, Doppler and SNR.
     def init(self, SINGEL_TYPE,P, L,LLI,D, S,CODE):
         self.SIGNEL_TYPE = SINGEL_TYPE
         self.P = P

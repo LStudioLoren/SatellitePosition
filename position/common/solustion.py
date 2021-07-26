@@ -5,6 +5,7 @@ class positionsol():
         self.gpsweek = 0
         self.X = [0.0,0.0,0.0,0.0]
         self.rr = [0.0,0.0,0.0,0.0,0.0,0.0]
+        self.qr = [0.0,0.0,0.0,0.0,0.0,0.0]
         #gpsweek = 0
         self.gpssec = 0
         #X = [0.0]
@@ -12,6 +13,7 @@ class positionsol():
         self.age = 0
         self.pos_type = 0
         self.dtr = 0
+        self.ratio = 0
 
     def update(self,X,ns,age,pos_type):
         for i in range(3):
