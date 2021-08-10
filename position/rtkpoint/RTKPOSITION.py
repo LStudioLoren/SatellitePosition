@@ -17,9 +17,9 @@ class RTKPARAM():
         self.nx = tool.MAXFREF
         self.na = 9
         self.tt = 0.0
-        #float解数据
+        #float解数据,前9个分别是位置、速度、加速度参数，后面前maxsat是L1的相位差，后面maxsat是L2 的相位差
         self.x = []
-        #float解精度
+        #float解精度，前9个是卫星、速度、加速度的误差模型参数
         self.P = []
         #固定解数组
         self.xa = []
@@ -52,22 +52,24 @@ class RTKPARAM():
 #残差参数类
 class zdresParam():
     def __init__(self):
-
+        # y数组的结构：
+        # 卫星的L1的载波，L2的载波，L1的伪距，L2的伪距的残差值
         self.y = []
+        # azel是记录每个卫星的方位及截止角
         self.azel = []
+        # 记录接收机到卫星的向量
         self.e = []
         self.xp = []
         self.state = 0
         self.vflg = []
         self.Pp = []
         self.v = []
+        # H矩阵的 1-3是保存观测卫星的向量- 参考卫星的向量
         self.H = []
         self.R = []
         self.nv = 0
         self.filterinfo = 0
     def init(self,nf,n):
-        # y数组的结构：
-        # 卫星的L1的载波，L2的载波，L1的伪距，L2的伪距
         self.y = tool.zeroMat(n,nf*2)
         self.azel = tool.zeroMat(n,2)
         self.e = tool.zeroMat(n,3)
@@ -104,6 +106,9 @@ class RTKPoistion():
         self.opt = OPTION.POSTIONOPTION()
 
     def exeRTKPositon(self,rtkParam,roverObs,baseObs,navDataList):
+        #上一次有效解算时间
+        prev_epocht = rtkParam.sol.gpssec
+
         #先计算单点位置，获取首次有效定位、速度
         rtkParam = SINGLEPOINTPOSITION.SinglePointPosition().exesinglepoint(roverObs, navDataList, rtkParam)
         rtkParam.rtkStatus = self.opt.mode
@@ -115,6 +120,10 @@ class RTKPoistion():
         if len(roverObs.obsary) < 4:
             rtkParam.update(rtkParam.sol.X, len(roverObs.obsary), 0, 0)
             return rtkParam.sol
+
+        #获取当前历元时间与上一历元时间差：
+        if prev_epocht != 0 : rtkParam.tt = rtkParam.sol.gpssec - prev_epocht
+
         #rtkParam.sol.rr = [-2333326.6741502904, 5383652.2228962239, 2492168.6526665115,0.0,0.0,0.0]
 
         #根据基站位置计算基于基站的卫星位置信息等
@@ -226,6 +235,7 @@ class RTKPoistion():
 
     #type ==0是基站
     #计算载波相位或伪距的非差残差。残差是指通过已知参数计算出来的值，再被实际记录的伪距/载波减去，得到的差值。
+    #根据载波方程 ψ
     def zdres(self,type,obs,nobs,nbaseobs,nrover,navList,rr,index,zParam):
         basei = 0
         if type == 0:
@@ -482,6 +492,15 @@ class RTKPoistion():
                     lami = tool.lam[f]
                     if( cp == 0  or pr == 0 or lami == 0) :
                         continue
+                    #波长lami = 光速C / 频点频率fi
+                    #载波相位（carrier-phase）
+                    #载波观测量（相位矩、phase-range） = carrier-phase * lami
+                    #载波观测量  = 载波相位*波长  =  伪距观测量 + 波长*相位差（bias）+误差
+                    #相位差 = 载波相位 -  伪距观测量 / 波长
+                    #zParam.v[nv][0] -= lami*rtkParam.x[self.IB(satList[i],f,self.opt)][0] -lamj*rtkParam.x[self.IB(satList[j],f,self.opt)][0]
+                    #zParam.v[nv][0] = y(双差)- (lami* cp_u_i- pr_u_i -lami *cp_r_j - pr_r_j)
+                    #这里通过移动站、基站的同一个卫星的载波差、伪距差，
+                    #cp1 - pr1/lami - cp2 - pr2 / lami ,得出两者的相位差的差。
                     bias[i][0] = cp- (pr /lami)
                 else:
                     print("")
@@ -503,12 +522,21 @@ class RTKPoistion():
                 self.initX(rtkParam,bias[i][0],self.opt.std[0]*self.opt.std[0],self.IB(satList[i],f,self.opt))
         return rtkParam
 
-
+    #
     def updos(self,rtkParam,tt):
+        tt = 0.01
         Q = [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]
         pos = [0.0,0.0,0.0]
 
         #如果是第一次定位，给rtk参数类赋值x数组、P数组
+        #x是状态矩阵，P是误差模型矩阵
+        #x =(位置、速度、加速度，各个移动站卫星的L1的相位差，各个移动站卫星的L2的相位差)= （x,y,z,vx,vy,vz,accx,accy,accz,b1i。。。b1n,b2i...b2n,b5i..b5n）
+        #预测噪声P = [位置误差模型3*3
+        #                    速度误差模型3*3
+        #                                  加速度误差模型3*3
+        #                                                移动站卫星数的L1的误差模型n*n
+        #                                                                         移动站卫星数的L1的误差模型m*m（m<=n）]
+        #当第二次定位时，这里的rtkparam中的x就是上一次最优解。
         if(tool.dot(rtkParam.getrr()) <= 0.0):
             for i in range(3):
                 #赋值位置
@@ -531,25 +559,29 @@ class RTKPoistion():
 
         F = tool.eyeMat(rtkParam.nx)
         #给F数组中的41、52、63、74、85、96,14、25、36、47、58、69赋值tt时间差。tt为0即不管时间差
-        for i in range(6):
-            F[i+3][i] = tt
+        #for i in range(6):
+            #F[i+3][i] = tt
         #FP = tool.zeroMat(rtkParam.nx,rtkParam.nx)
         #xp = tool.zeroMat(rtkParam.nx,1)
         for i in range(6):
             F[i][i+3] = tt
         #print(rtkParam.x)
 
-        #数学模型：P = F *P *F + Q,x = F * x
+        #数学模型：P（下一个时刻，更新转态前的协方差矩阵） =
+        #    F（历元从t到t+1的系统噪声转换矩阵） *P（上一个时刻，更新转态后的协方差矩阵） *F_t（历元从t到t+1的系统噪声转换矩阵的倒置）
+        #    + Q（历元从t到t+1的系统噪声协方差矩阵）
+        #
+        #    x（状态矩阵，历元t+1，未更新状态前） = F（历元从t到t+1的系统噪声转换矩阵） * x（历元t，更新状态后）
         #x矩阵乘以F矩阵，更新时间差tt，这里tt是0，所以xp就=x
-        xp = tool.mulmatirix(rtkParam.nx,1,rtkParam.nx,F,rtkParam.x,1,0,"TN",[])
+        xp = tool.mulmatirix(rtkParam.nx,1,rtkParam.nx,F,rtkParam.x,1,0,"NN",[])
         #与上同理，FP = P
-        FP = tool.mulmatirix(rtkParam.nx,rtkParam.nx,rtkParam.nx,F,rtkParam.P,1,0,"TN",[])
+        FP = tool.mulmatirix(rtkParam.nx,rtkParam.nx,rtkParam.nx,F,rtkParam.P,1,0,"NN",[])
         #FP*F 同理，P= FP
-        rtkParam.P = tool.mulmatirix(rtkParam.nx,rtkParam.nx,rtkParam.nx,FP,F,1,0,"TT",[])
+        rtkParam.P = tool.mulmatirix(rtkParam.nx,rtkParam.nx,rtkParam.nx,FP,F,1,0,"NT",[])
         #重新赋值x
         rtkParam.x = xp
         #prn[3]\[4]分别是平面加速度、垂直加速度的噪声
-        #Q:
+        #Q就是噪声的协方差矩阵:
         # 0 3 6
         # 1 4 5
         # 2 5 8
@@ -559,6 +591,10 @@ class RTKPoistion():
         pos = RTKCOMMON.eceftopos(rtkParam.getrr(),pos)
         #print(pos)
         #pos = [0.40407093076627232, 1.9797683819037855, 20.058078320696950]
+        #Qv = [ 0 0 0
+        #       0 0 0
+        #       0 0 0
+        #             Q(3*3)]
         Qv = self.convEcef(pos,Q)
         for i in range(3):
             for j in range(3):
@@ -638,11 +674,24 @@ class RTKPoistion():
                 rtkParam.ssatList[i].resc[j] = 0
         #计算电离层、对流层延迟，暂时忽略
 
-
+        #这一步生成H矩阵，其中，h（x） = （h（L1载波），h（L2载波），h（L5载波），h（L1伪距），h（L2伪距），h（L5伪距））
+        #h（L1载波） = p+lam1*B1 。。。
+        #h（L1伪距） = p =sqrt((xs-xu)^2+(ys-yu)^2+(zs-zu)^2)
+        #h(rb,L1载波) = h（r,L1载波）-h（b,L1载波）。。。。
+        #H(x)是对h（x）对X0（x0,y0,z0）求偏导数，
+        #H（x） = (ex,ey,ez），及用户机到卫星的几何距离的三个方向的向量。
+        #H = -D*E = [ ex1(L1C),ex2(L1C)....exn(L1C),ex1(L2C)...exn(L2C),ex1(L1P)...exn(L1P),ex1(L2P)..exn(L2P)
+        #      ey1(L1C) ...
+        #      ez1(L1C) ....
+        #D矩阵是单差矩阵，列都为的，表示该位置的卫星号作为单差参考卫星，这里是截止角最高的卫星
+        #D = [ 1 -1  0 ...
+        #      1  0 -1 ...
+        #      ....
+        #      1  0 ....-1 ]
         for m in range(2):
             for f in range(nf*2): #f :0 - 3 ,nf : 0 - 1
                 i = -1
-                #查找参考卫星钟截止角最高的卫星号i
+                #查找参考卫星钟截止角最高的卫星号i作为用于做双差的参考卫星
                 for j in range(ns):
                     sysi = rtkParam.ssatList[satList[j]-1].sys
                     #0 = gps/sbas/qzss，1=glo
@@ -674,12 +723,14 @@ class RTKPoistion():
                     #         Hi.append(zParam.H[h][zParam.nv])
                     #     #Hi = zParam.H[zParam.nv*rtkParam.nx]
                     #计算双差，
-                    # 将（移动站截止角最高卫星的残差-基站对应的卫星残差）-（移动站其它卫星的残差-基站对应卫星的残差）
+                    # 将计算参考卫星i的单差：（移动站截止角最高卫星的残差-基站对应的卫星残差）
+                    # 再减去其它观测卫星j的单差 （移动站其它卫星的残差-基站对应卫星的残差）
                     zParam.v[nv][0] = (zParam.y[iRover[i]][f]-zParam.y[iBase[i]][f])\
                                       -(zParam.y[iRover[j]][f] - zParam.y[iBase[j]][f])
                     if HStatus == 1 :
                         for k in range(3):
                             #Hi[k] = -zParam.e[iRover[i]][k]+zParam.e[iRover[j]][k]
+                            # 计算参考卫星的与观测卫星的向量差（实际是H = h（x）对X（x，y，z）=X0(x0，y0，z0)=x0求偏导）。
                             zParam.H[k][nv] = -zParam.e[iRover[i]][k] + zParam.e[iRover[j]][k]
                     if f < nf:
                         if self.opt.ionomodel != 2:
@@ -689,6 +740,7 @@ class RTKPoistion():
                                             -lamj*rtkParam.x[self.IB(satList[j],f,self.opt)][0]
                             #更新H数组中对应的位置的频率，当前卫星的频率为-
                             if HStatus == 1:
+
                                 zParam.H[self.IB(satList[i],f,self.opt)][nv] = lami
                                 zParam.H[self.IB(satList[j],f,self.opt)][nv] = -lamj
                         else:
@@ -746,7 +798,21 @@ class RTKPoistion():
                 b +=1
             zParam = self.ddcov(nb,b,Ri,Rj,zParam)
         return zParam
-    ##
+    #将参考卫星i的L1、L2的载波和伪距的方差转换为协方差矩阵，
+    #R = [ D*Ri_L1C*D_T
+    #                  D * Ri_L2C * D_T
+    #                                  D*Ri_L1P*D_T
+    #                                               D*Ri_L2P*D_T
+    #D= [1 -1  0  0  0  0
+    #    1  0 -1 ...
+    #    ...
+    #    1              -1
+    # ]
+    #Ri = [ Ri  0   0  0 0 0
+    #       0   Rj1 0
+    #
+    #         ......       Rj5]
+    # ]
     def ddcov(self,nb,n,Ri,Rj,zParam):
         for i in range(zParam.nv):
             for j in range(zParam.nv):
@@ -765,6 +831,11 @@ class RTKPoistion():
             k+=nb[b]
 
         return zParam
+    #通过设置的标准差参数，计算出方差。
+    #a是载波相位的误差标准差的基本项，a^2是方差
+    #b是载波相位的误差标准差的仰角相关项，(b/sinel)^2就是方差
+    #计算公式；
+    #这里是输出2倍σ，2 * eratio*（a^2+(b/sinel)^2）
     def varerr(self,satNo,sys,el,bl,dt,f,opt):
         a = b = c = opt.err[3]*bl/1E4
         d = tool.CLIGHT*opt.sclkstab*dt
@@ -777,11 +848,12 @@ class RTKPoistion():
         elif(f < nf and opt.ena[1] > 0):
             print()
         else:
+            #伪距的fact标度因子为100，载波为1
             if(f >= nf) : fact = opt.eratio[f - nf]
             if(fact <= 0) : fact = opt.eratio[0]
             fact *= 1
-            a = fact * opt.err[1]
-            b = fact * opt.err[2]
+            a = fact * opt.err[1]#0.3
+            b = fact * opt.err[2]#0.3
         return 2.0* (3 if opt.ionomodel == 2 else 1)*(a*a +b*b/sinel/sinel +c*c) +d*d
 
     def filter(self,zParam,n,m):
@@ -802,11 +874,14 @@ class RTKPoistion():
             for j in range(k):
                 P_[i][j] = zParam.Pp[ix[i][0]][ix[j][0]]
             for j in range(m):
+                #H矩阵是每一列为一个卫星的数据。
                 H_[i][j] = zParam.H[ix[i][0]][j]
         Q = zParam.R
         xp_ = x_
-        #Q = H_t * P_t * H + R
-        F = tool.mulmatirix(k,m,k,P_,H_,1,0,"TN",[])#F:k行m列
+        #K = P*H*(H'*P*H + R)^-1   xp = x + K* v   Pp = (I - K* H')*P
+        #P * H 就是每个卫星的每个参数都乘对应的误差模型参数
+        F = tool.mulmatirix(k,m,k,P_,H_,1,0,"NN",[])#F:k行m列
+        #Q = H' * P * H
         Q = tool.mulmatirix(m,m,k,H_,F,1,1,"TN",Q)#Q：k行K列
 
 
@@ -814,7 +889,7 @@ class RTKPoistion():
         Q_1 = np.linalg.inv(Q)
         #except np.linalg.LinAlgError:
         # K = F * Q_1_T
-        K = tool.mulmatirix(k,m,m,F,Q_1,1,0,"NT",[])#K k col m row
+        K = tool.mulmatirix(k,m,m,F,Q_1,1,0,"NN",[])#K k col m row
         #xp = K*v +xp_
         xp_ = tool.mulmatirix(k,1,m,K,zParam.v,1,1,"NN",xp_)  #xp: k col,1 rows
         #I = I - K*H_t
