@@ -102,11 +102,13 @@ class SinglePointPosition():
         rr = [0.0, 0.0, 0.0]
         # X是x,y,z,dtr位置
         X = sol.X
+        print("天线位置：X = ", X[0], " Y = ", X[1], " Z = ", X[2])
         # dx是x,y,z误差
         dx = []
 
         count = 0
         while (1):
+
             pos = [0, 0, 0]
             for i in range(3):
                 # rr是上一次计算出来的接收机的x、y、z
@@ -142,8 +144,10 @@ class SinglePointPosition():
                 X[i] += dx[i]
 
             count += 1
+            print("迭代次数：",count)
+            print("天线位置：X = ", X[0], " Y = ", X[1], " Z = ", X[2]," dt = ",X[3])
             if np.sqrt(tool.dot(dx) < 1E-4):
-                print("LSP处理次数：", count)
+                #print("处理次数：", count)
                 break
         sol.update(X, spparm.vn, 0, 1)
         spparm.sol = sol
@@ -185,7 +189,7 @@ class SinglePointPosition():
             tropCorr = self.tropcorr(t_obs,pos,azelList[i],1)
             pCorr = self.prange(OBS_DATA,nav_list,azelList[i],i)
             #dtrp = 0
-            #print("P =",pCorr[0], "  r=  ",r,"  "," dtr = ",dtr," nav_list[i].dts= ",nav_list[i].dts," ionCorr[0]= ",ionCorr[0]," tropCorr[0]= ",tropCorr[0])
+            print("卫星号 = ",OBS_DATA.obsary[i].prn,"，接收机输出的伪距 =",pCorr[0], "  r=  ",r,"  "," 接收机钟差 = ",dtr," 卫星钟差= ",nav_list[i].dts," 电离层误差= ",ionCorr[0]," 对流层误差= ",tropCorr[0])
             V[vn] = pCorr[0] - (r + dtr - tool.CLIGHT * nav_list[i].dts + ionCorr[0] + tropCorr[0])
             # 将e数组变乘以-1，主要是用于后续最小二乘法中去。并合并到大数组中，得到LSP需要的矩阵H
             for j in range(3):

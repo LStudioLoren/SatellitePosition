@@ -65,8 +65,8 @@ class SatPos():
         dts = dts - 2 * np.sqrt(tool.GM * navData.Sqrt_A * navData.Sqrt_A) * navData.e * np.sin(Ek) / (
                 tool.CLIGHT * tool.CLIGHT)
         vare = navData.SAV * navData.SAV
-        #print(navData.prn, "dts = ", dts, "vare = ", vare)
-        #print("Xs = ", Xs, " Ys = ", Ys, " Zs = ", Zs)
+
+        #print()
         #navData.updateParam(Xs, Ys, Zs, dts, vare)
         # navData.updataDtsAndVare()
         # navData.updataVare(vare)
@@ -90,6 +90,7 @@ class SatPos():
         navData2 = self.nav2pos(t_obs, navData)
         # += 0.1
         #navData2 = self.nav2pos(t_obs,navDataTemp)
+        print("卫星：", navData.prn, "  卫星坐标： ", navData1[0],navData1[1],navData1[2]," 卫星钟差：", dt)
         navData.updateParam(navData1[0],navData1[1],navData1[2],((navData2[0] - navData1[0])/1E-3),((navData2[1] - navData1[1])/1E-3),((navData2[2] - navData1[2])/1E-3),navData1[3],navData1[4])
         return navData
 
