@@ -179,7 +179,7 @@ def LSQ(n,k,m,A,y,C):
     #Q = A^t*A
     #Q = mulmatirix_multi(n,k,m,A,A)
     Q = mulmatirix(n,k,m,A,A,1,0,"TN",[])
-    print("Q = ",Q)
+    #print("Q = ",Q)
     #Q_1 = Q inv,Q-1
     #这个是将A^T*A求逆
     Q_1 = np.linalg.inv(Q)
