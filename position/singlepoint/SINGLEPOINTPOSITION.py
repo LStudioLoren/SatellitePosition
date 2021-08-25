@@ -40,7 +40,7 @@ class SPPParm():
         self.vn = 0
         # 几何矩阵
         self.e_matrix = []
-        # 伪距矩阵
+        # 伪距修正矩阵
         self.V = []
         # 加权矩阵
         self.Var = []
@@ -381,6 +381,7 @@ class SinglePointPosition():
         #sppparm = SPPParm()
         sol.init(OBS_DATA.gpsweek, OBS_DATA.t_obs)
         #rtkParam.updateSol(sol)
+        #输入卫星坐标、接收机的伪距观测值，计算天线位置
         sppparm = self.estpos(nav_list, OBS_DATA, sol)
 
         self.estvel(OBS_DATA,nav_list,sol,sppparm.vsat,sppparm.azel)
